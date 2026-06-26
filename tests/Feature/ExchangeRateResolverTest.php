@@ -2,6 +2,11 @@
 
 use CarlVallory\KrayinNetValue\Models\ExchangeRate;
 use CarlVallory\KrayinNetValue\Services\ExchangeRateResolver;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+
+// Aísla el test: todo lo que toca la BD se revierte por rollback al terminar
+// (el delete() del beforeEach NO persiste). Evita el footgun de truncar datos reales.
+uses(DatabaseTransactions::class);
 
 beforeEach(function () {
     ExchangeRate::query()->delete();

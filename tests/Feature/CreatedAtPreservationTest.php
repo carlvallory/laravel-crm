@@ -1,7 +1,11 @@
 <?php
 
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Webkul\Lead\Repositories\LeadRepository;
+
+// Rollback automático: el lead y los pipelines/stages creados no quedan persistidos.
+uses(DatabaseTransactions::class);
 
 it('preserva el created_at enviado al crear un lead', function () {
     // Pipeline + stage mínimos para el create del repo
