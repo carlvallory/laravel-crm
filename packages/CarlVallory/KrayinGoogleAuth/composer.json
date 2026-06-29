@@ -1,0 +1,25 @@
+{
+    "name": "carlvallory/krayin-google-auth",
+    "description": "Login con Google OAuth para Krayin CRM (MuCi)",
+    "license": "MIT",
+    "authors": [
+        { "name": "Carl Vallory", "email": "carlos@muci.org" }
+    ],
+    "require": {
+        "laravel/socialite": "^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "CarlVallory\\KrayinGoogleAuth\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "CarlVallory\\KrayinGoogleAuth\\Providers\\KrayinGoogleAuthServiceProvider"
+            ],
+            "aliases": {}
+        }
+    },
+    "minimum-stability": "dev"
+}
