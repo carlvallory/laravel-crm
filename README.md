@@ -107,6 +107,16 @@ php artisan route:clear
 php artisan serve
 ```
 
+##### Documentación de la API (Swagger / l5-swagger)
+
+> **Nota MuCi:** el archivo generado `storage/api-docs/api-docs.json` **no se versiona** (está en `.gitignore`, es regenerable y pesa ~620K). Tras un clone o `composer install`, hay que generarlo para que funcione la página `/api/documentation`:
+>
+> ```
+> php artisan l5-swagger:generate
+> ```
+>
+> Solo la config (`config/l5-swagger.php`) está versionada. Si en producción no hay un paso de build, correr el comando de arriba en cada deploy (o setear `L5_SWAGGER_GENERATE_ALWAYS=true` en entornos de desarrollo).
+
 
 **How to log in as admin:**
 

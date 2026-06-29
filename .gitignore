@@ -37,3 +37,7 @@ node_modules/
 #package
 /packages/Vallory
 /packages/CarlVallory
+
+# generados / cache (regenerables — no versionar)
+/.phpunit.cache
+/storage/api-docs
