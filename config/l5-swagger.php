@@ -63,9 +63,11 @@ return [
              * Middleware allows to prevent unexpected access to API documentation
             */
             'middleware' => [
-                'api'             => [],
+                // MuCi: en producción la doc de la API exige estar logueado (guard admin de Krayin).
+                // En local queda abierta para desarrollar sin fricción.
+                'api'             => app()->environment('production') ? ['auth:user'] : [],
                 'asset'           => [],
-                'docs'            => [],
+                'docs'            => app()->environment('production') ? ['auth:user'] : [],
                 'oauth2_callback' => [],
             ],
 
