@@ -1,8 +1,32 @@
 # HANDOFF — Login Google OAuth (KrayinGoogleAuth)
 
-**Fecha:** 2026-06-29
+**Fecha:** 2026-06-29 · **Actualizado:** 2026-07-01
 **Para:** la próxima IA/sesión que continúe esta feature
-**Estado:** 2 de 9 tareas implementadas (T1, T2). Pausado a pedido del usuario.
+**Estado:** **7 de 9 tareas implementadas (T1–T7).** Pausado a pedido del usuario el 2026-07-01. Suite GoogleAuth: **15 tests / 40 asserts, TODO VERDE.**
+
+---
+
+## ⏩ ESTADO AL 2026-07-01 (leer esto primero)
+
+Implementadas y commiteadas T3–T7 (ejecución directa TDD por el controlador, dual-repo: código→repo del paquete, tests→laravel-crm/tests). Detalle por tarea con hashes en `.superpowers/sdd/progress.md`.
+
+- **T3** rol Básico (pkg `084a43b`, crm `19b64bab`). Se quitó `contacts.organizations.view` del set de permisos (NO existe en `acl.php`).
+- **T4** resolver + DTOs (pkg `ea4ceb8`, crm `a241ba37`) **+ HARDENING de seguridad** (pkg `dca087a`, crm `ddd77c4b`): agregado `GoogleAccount.emailVerified`; el resolver ya NO autovincula por email ni auto-aprueba con `email_verified=false`; lanza `RuntimeException` si falta el rol por defecto. Decisión de Carlos: "endurecer (recomendado)" tras un review de seguridad automático. Finding de paridad de dominio se dejó como diseño aprobado.
+- **T5** controller + rutas redirect/callback (pkg `c9cc302`, crm `aa13a7bb`). El controller lee el claim `email_verified`.
+- **T6** botón Google + ocultar form nativo (pkg `0abfa4f`, crm `b3465ae2`). Inyectado vía `Event::listen('admin.sessions.login.form_controls.before')`; el botón queda FUERA del `<form>`, así que el CSS oculta `form[action=admin.session.store]` sin esconderlo. Toggle `GOOGLE_AUTH_SHOW_PASSWORD_LOGIN`.
+- **T7** aprobación de pendientes (pkg `81fa3b7`, crm `7ea47588`). Rutas `['web','user']` prefijo `admin/google-auth`.
+
+**RETOMAR EN T8** (comando `google-auth:uninstall`). ⚠️ Su test hace `ALTER TABLE` (DDL NO transaccional en MariaDB) → **correr con backup** (`/tmp/krayin_backup_pre_oauth_1782929592.sql`) y **restaurar** el esquema después: `DELETE FROM migrations WHERE migration IN ('2026_06_29_100000_add_google_columns_to_users_table','2026_06_29_100100_seed_basico_role');` + `php artisan migrate --force`, luego verificar columnas+rol.
+
+**Después de T8:** T9 (README del paquete + suite final) → review whole-branch con **opus** (`superpowers:requesting-code-review`) → `superpowers:finishing-a-development-branch`.
+
+**🔴 PENDIENTE CRÍTICO:** la rama `feat/google-oauth-login` (laravel-crm) y el repo del paquete `KrayinGoogleAuth` están **SOLO LOCALES, sin pushear** → sin backup remoto. Pushear al retomar (o antes).
+
+**Datos de contexto ya verificados esta sesión (no re-explorar):** hook login = `admin.sessions.login.form_controls.before` (login.blade.php:25); rutas admin bajo prefijo `config('app.admin_path')` + middleware `['web','admin_locale','user']`; alias `user`=`Bouncer` (guest→redirect a `admin.session.create`, no 500); nombres de ruta `admin.session.create/store/destroy`, `admin.dashboard.index`; tests en `laravel-crm/tests` con namespace `Tests\Feature\*` (NO `CarlVallory\...\Tests` como decía el plan). Backup DB pre-trabajo: `/tmp/krayin_backup_pre_oauth_1782929592.sql`.
+
+---
+
+### Estado histórico (2026-06-29, T1–T2)
 
 ---
 
