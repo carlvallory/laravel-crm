@@ -118,4 +118,26 @@ class GoogleUserResolverTest extends TestCase
         $this->assertFalse($result->allowed);
         $this->assertEquals(0, $result->user->status);
     }
+
+    public function test_new_muci_user_has_google_id_and_provider_stored(): void
+    {
+        $result = $this->resolver()->resolve(new GoogleAccount(
+            email: 'googleid-test@muci.org', googleId: 'g-f1a', name: 'F1A', hostedDomain: 'muci.org', emailVerified: true
+        ));
+
+        $fresh = $result->user->fresh();
+        $this->assertEquals('g-f1a', $fresh->google_id);
+        $this->assertEquals('google', $fresh->auth_provider);
+    }
+
+    public function test_new_external_pending_user_has_google_id_and_provider_stored(): void
+    {
+        $result = $this->resolver()->resolve(new GoogleAccount(
+            email: 'pending-f1b@gmail.com', googleId: 'g-f1b', name: 'F1B', hostedDomain: null, emailVerified: true
+        ));
+
+        $fresh = $result->user->fresh();
+        $this->assertEquals('g-f1b', $fresh->google_id);
+        $this->assertEquals('google', $fresh->auth_provider);
+    }
 }
