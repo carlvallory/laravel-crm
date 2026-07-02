@@ -121,4 +121,57 @@ class PendingApprovalTest extends TestCase
 
         $response->assertStatus(401);
     }
+
+    public function test_custom_role_with_exact_google_pending_key_can_list_pending(): void
+    {
+        // Positive: a role with permission_type='custom' and EXACTLY ['settings.user.users.google_pending']
+        // must pass both middleware (ACL key match) and the controller guard (same key).
+        $role = Role::firstOrCreate(['name' => 'Google Approver'], [
+            'permission_type' => 'custom',
+            'permissions'     => ['settings.user.users.google_pending'],
+        ]);
+
+        $approver = User::create([
+            'name' => 'Approver', 'email' => 'approver-f2c@muci.org', 'status' => 1,
+            'password' => bcrypt('secret'), 'role_id' => $role->id,
+        ]);
+
+        $response = $this->actingAs($approver, 'user')
+            ->get(route('google-auth.pending.index'));
+
+        $response->assertStatus(200);
+    }
+
+    public function test_custom_role_with_exact_google_pending_key_can_approve_pending_user(): void
+    {
+        // Positive: same role as above should also be able to POST approve a pending Google user.
+        $basico = Role::firstOrCreate(['name' => 'Básico'], [
+            'permission_type' => 'custom',
+            'permissions'     => ['dashboard'],
+        ]);
+
+        $role = Role::firstOrCreate(['name' => 'Google Approver'], [
+            'permission_type' => 'custom',
+            'permissions'     => ['settings.user.users.google_pending'],
+        ]);
+
+        $approver = User::create([
+            'name' => 'Approver2', 'email' => 'approver2-f2d@muci.org', 'status' => 1,
+            'password' => bcrypt('secret'), 'role_id' => $role->id,
+        ]);
+
+        $pending = new User([
+            'name' => 'PendingG', 'email' => 'pending-f2d@gmail.com', 'status' => 0,
+            'role_id' => $basico->id,
+        ]);
+        $pending->auth_provider = 'google';
+        $pending->google_id     = 'g-f2d';
+        $pending->save();
+
+        $response = $this->actingAs($approver, 'user')
+            ->post(route('google-auth.pending.approve', $pending->id));
+
+        $response->assertRedirect();
+        $this->assertEquals(1, $pending->fresh()->status);
+    }
 }
