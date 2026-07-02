@@ -14,6 +14,24 @@ class UninstallCommandTest extends TestCase
     use DatabaseTransactions;
 
     /**
+     * setUp limpia filas residuales ANTES de cada test.
+     * El happy-path emite DDL (ALTER TABLE / DROP COLUMN), lo que hace un commit
+     * implícito en MariaDB y rompe el rollback de DatabaseTransactions; las filas
+     * de fixture quedan en la BD compartida entre ejecuciones.
+     * Limpiar en setUp (no en tearDown) es idempotente sea cual sea el estado
+     * transaccional del test anterior.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DB::table('users')->whereIn('email', [
+            'basico-orphan@muci.org',
+            'basico-happy@muci.org',
+        ])->delete();
+    }
+
+    /**
      * Abort: rol de respaldo inexistente + usuarios con Básico → FAILURE, nada se toca.
      * No hace DDL, seguro con DatabaseTransactions.
      */
