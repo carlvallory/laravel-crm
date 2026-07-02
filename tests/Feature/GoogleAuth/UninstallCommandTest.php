@@ -28,6 +28,7 @@ class UninstallCommandTest extends TestCase
         DB::table('users')->whereIn('email', [
             'basico-orphan@muci.org',
             'basico-happy@muci.org',
+            'basico-decline@muci.org',
         ])->delete();
     }
 
@@ -61,6 +62,39 @@ class UninstallCommandTest extends TestCase
     }
 
     /**
+     * Decline: fallback existe pero el usuario rechaza la confirmación → FAILURE, nada cambia.
+     * No hace DDL, seguro con DatabaseTransactions.
+     */
+    public function test_uninstall_aborts_when_user_declines_confirmation(): void
+    {
+        $administrator = Role::firstOrCreate(['name' => 'Administrator'], ['permission_type' => 'all']);
+
+        $basico = Role::firstOrCreate(['name' => 'Básico'], [
+            'permission_type' => 'custom', 'permissions' => ['dashboard'],
+        ]);
+
+        $user = User::create([
+            'name'  => 'Usuario Básico Decline',
+            'email' => 'basico-decline@muci.org',
+            'status' => 1,
+            'password' => bcrypt('secret'),
+            'role_id' => $basico->id,
+        ]);
+
+        $this->artisan('google-auth:uninstall')
+            ->expectsQuestion('¿Continuar?', false)
+            ->assertExitCode(1);
+
+        // Rol Básico sigue existiendo — no fue borrado.
+        $this->assertNotNull(DB::table('roles')->where('name', 'Básico')->first());
+        // Usuario sigue con rol Básico — no fue reasignado.
+        $this->assertEquals($basico->id, DB::table('users')->where('id', $user->id)->value('role_id'));
+        // Columnas siguen existiendo — DDL no fue ejecutado.
+        $this->assertTrue(Schema::hasColumn('users', 'google_id'));
+        $this->assertTrue(Schema::hasColumn('users', 'auth_provider'));
+    }
+
+    /**
      * Happy path: rol Básico existe con un usuario asignado → usuario reasignado
      * a Administrator, rol borrado, columnas eliminadas.
      * ADVERTENCIA: hace DDL real (no transaccional). Restaurar esquema después.
@@ -81,7 +115,7 @@ class UninstallCommandTest extends TestCase
             'role_id' => $basico->id,
         ]);
 
-        $this->artisan('google-auth:uninstall')->assertExitCode(0);
+        $this->artisan('google-auth:uninstall', ['--force' => true])->assertExitCode(0);
 
         // Rol Básico fue eliminado.
         $this->assertNull(DB::table('roles')->where('name', 'Básico')->first());

@@ -27,10 +27,13 @@ class PendingApprovalTest extends TestCase
             'permission_type' => 'custom', 'permissions' => ['dashboard'],
         ]);
 
-        $pending = User::create([
+        $pending = new User([
             'name' => 'Pend', 'email' => 'pend@gmail.com', 'status' => 0,
-            'auth_provider' => 'google', 'google_id' => 'g-200', 'role_id' => $basico->id,
+            'role_id' => $basico->id,
         ]);
+        $pending->auth_provider = 'google';
+        $pending->google_id     = 'g-200';
+        $pending->save();
 
         $response = $this->actingAs($this->admin(), 'user')
             ->post(route('google-auth.pending.approve', $pending->id));
@@ -105,10 +108,13 @@ class PendingApprovalTest extends TestCase
             'password' => bcrypt('secret'), 'role_id' => $basico->id,
         ]);
 
-        $pending = User::create([
+        $pending = new User([
             'name' => 'Pending', 'email' => 'pending-f2@gmail.com', 'status' => 0,
-            'auth_provider' => 'google', 'google_id' => 'g-f2', 'role_id' => $basico->id,
+            'role_id' => $basico->id,
         ]);
+        $pending->auth_provider = 'google';
+        $pending->google_id     = 'g-f2';
+        $pending->save();
 
         $response = $this->actingAs($basicoUser, 'user')
             ->post(route('google-auth.pending.approve', $pending->id));

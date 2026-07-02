@@ -95,11 +95,13 @@ class GoogleUserResolverTest extends TestCase
 
     public function test_existing_pending_user_is_rejected(): void
     {
-        User::create([
+        $u = new User([
             'name' => 'Pend', 'email' => 'pend@gmail.com', 'status' => 0,
-            'auth_provider' => 'google', 'google_id' => 'g-4',
             'role_id' => Role::where('name', 'Básico')->first()->id,
         ]);
+        $u->auth_provider = 'google';
+        $u->google_id     = 'g-4';
+        $u->save();
 
         $result = $this->resolver()->resolve(new GoogleAccount(
             email: 'pend@gmail.com', googleId: 'g-4', name: 'Pend', hostedDomain: null
