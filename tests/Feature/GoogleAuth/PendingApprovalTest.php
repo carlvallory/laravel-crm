@@ -44,4 +44,75 @@ class PendingApprovalTest extends TestCase
         $response = $this->get(route('google-auth.pending.index'));
         $response->assertRedirect(route('admin.session.create'));
     }
+
+    public function test_approving_already_active_user_returns_404(): void
+    {
+        $role = Role::firstOrCreate(['name' => 'Administrator'], ['permission_type' => 'all']);
+
+        $activeUser = User::create([
+            'name' => 'Active', 'email' => 'active-f3@muci.org', 'status' => 1,
+            'password' => bcrypt('secret'), 'role_id' => $role->id,
+        ]);
+
+        $response = $this->actingAs($this->admin(), 'user')
+            ->post(route('google-auth.pending.approve', $activeUser->id));
+
+        $response->assertStatus(404);
+    }
+
+    public function test_approving_non_google_pending_user_returns_404(): void
+    {
+        $role = Role::firstOrCreate(['name' => 'Administrator'], ['permission_type' => 'all']);
+
+        $nativeUser = User::create([
+            'name' => 'NativeUser', 'email' => 'native-f3@muci.org', 'status' => 0,
+            'password' => bcrypt('secret'), 'role_id' => $role->id,
+        ]);
+
+        $response = $this->actingAs($this->admin(), 'user')
+            ->post(route('google-auth.pending.approve', $nativeUser->id));
+
+        $response->assertStatus(404);
+    }
+
+    public function test_basico_user_cannot_access_pending_list(): void
+    {
+        $basico = Role::firstOrCreate(['name' => 'Básico'], [
+            'permission_type' => 'custom',
+            'permissions'     => ['dashboard'],
+        ]);
+
+        $basicoUser = User::create([
+            'name' => 'Basico User', 'email' => 'basico-f2@muci.org', 'status' => 1,
+            'password' => bcrypt('secret'), 'role_id' => $basico->id,
+        ]);
+
+        $response = $this->actingAs($basicoUser, 'user')
+            ->get(route('google-auth.pending.index'));
+
+        $response->assertStatus(401);
+    }
+
+    public function test_basico_user_cannot_approve_pending_user(): void
+    {
+        $basico = Role::firstOrCreate(['name' => 'Básico'], [
+            'permission_type' => 'custom',
+            'permissions'     => ['dashboard'],
+        ]);
+
+        $basicoUser = User::create([
+            'name' => 'Basico User2', 'email' => 'basico-f2b@muci.org', 'status' => 1,
+            'password' => bcrypt('secret'), 'role_id' => $basico->id,
+        ]);
+
+        $pending = User::create([
+            'name' => 'Pending', 'email' => 'pending-f2@gmail.com', 'status' => 0,
+            'auth_provider' => 'google', 'google_id' => 'g-f2', 'role_id' => $basico->id,
+        ]);
+
+        $response = $this->actingAs($basicoUser, 'user')
+            ->post(route('google-auth.pending.approve', $pending->id));
+
+        $response->assertStatus(401);
+    }
 }
