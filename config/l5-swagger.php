@@ -65,9 +65,9 @@ return [
             'middleware' => [
                 // MuCi: en producción la doc de la API exige estar logueado (guard admin de Krayin).
                 // En local queda abierta para desarrollar sin fricción.
-                'api'             => app()->environment('production') ? ['auth:user'] : [],
+                'api'             => env('APP_ENV') === 'production' ? ['auth:user'] : [],
                 'asset'           => [],
-                'docs'            => app()->environment('production') ? ['auth:user'] : [],
+                'docs'            => env('APP_ENV') === 'production' ? ['auth:user'] : [],
                 'oauth2_callback' => [],
             ],
 
