@@ -1,12 +1,31 @@
 # HANDOFF — Login Google OAuth (KrayinGoogleAuth)
 
-**Fecha:** 2026-06-29 · **Actualizado:** 2026-07-01
+**Fecha:** 2026-06-29 · **Actualizado:** 2026-07-02
 **Para:** la próxima IA/sesión que continúe esta feature
-**Estado:** **7 de 9 tareas implementadas (T1–T7).** Pausado a pedido del usuario el 2026-07-01. Suite GoogleAuth: **15 tests / 40 asserts, TODO VERDE.**
+**Estado:** **FEATURE COMPLETA 9/9 + review whole-branch final (opus) APROBADA — READY TO MERGE.**
 
 ---
 
-## ⏩ ESTADO AL 2026-07-01 (leer esto primero)
+## ⏩ ESTADO FINAL AL 2026-07-02 (leer esto primero)
+
+**La implementación TERMINÓ.** T8 (uninstall) y T9 (README + suite) completadas; review final whole-branch (opus) encontró 2 Critical + hallazgos de seguridad, TODOS corregidos con tests de regresión y re-verificados (detalle completo en `.superpowers/sdd/progress.md`, sección "REVIEW FINAL WHOLE-BRANCH"). Suites: 23 tests/51 asserts + uninstall 3/15, todo verde. Core Webkul intacto (net-cero verificado).
+
+- **PR #2 abierto:** https://github.com/carlvallory/laravel-crm/pull/2 (`feat/google-oauth-login` @ `b14f6d93` → `2.1`). Merge = decisión de Carlos.
+- **Paquete en repo propio pusheado:** https://github.com/carlvallory/krayin-google-auth (`main` @ `7645cf9`).
+- **Único pendiente antes de producción:** verificación manual con credenciales Google reales (sección al final de este doc). El deploy de OAuth va APARTE del bloque USD/marketing — ver `DEPLOY-PRODUCCION.md` (raíz del workspace), Bloque 2.
+
+**Fixes de seguridad de la review final (NO regresionar):**
+1. `google_id`/`auth_provider` NO son fillable en el core → persistir SIEMPRE por asignación directa de propiedades (nunca `User::create([...])` con esos campos).
+2. Rutas de aprobación gateadas por ACL de paquete (`src/Config/acl.php`, clave `settings.user.users.google_pending`, merge vía `mergeConfigFrom(...,'acl')`) + guard idéntico en `PendingUserController` — mantener la MISMA clave en ambos lados.
+3. `approve()` scopeado: `where('status',0)->where('auth_provider','google')`.
+4. `google-auth:uninstall` pide confirmación antes de reasignar usuarios Básico al rol fallback (`--force` para scripts).
+5. Logo Google = SVG inline (sin requests externos en el login).
+
+**Adjudicado (no "corregir"):** `config/l5-swagger.php` usa `env('APP_ENV')` a propósito — `env()` en config files se evalúa en `config:cache`; `app()->environment()` ahí rompía `package:discover`.
+
+---
+
+### Estado histórico (2026-07-01, T1–T7)
 
 Implementadas y commiteadas T3–T7 (ejecución directa TDD por el controlador, dual-repo: código→repo del paquete, tests→laravel-crm/tests). Detalle por tarea con hashes en `.superpowers/sdd/progress.md`.
 
@@ -16,11 +35,9 @@ Implementadas y commiteadas T3–T7 (ejecución directa TDD por el controlador, 
 - **T6** botón Google + ocultar form nativo (pkg `0abfa4f`, crm `b3465ae2`). Inyectado vía `Event::listen('admin.sessions.login.form_controls.before')`; el botón queda FUERA del `<form>`, así que el CSS oculta `form[action=admin.session.store]` sin esconderlo. Toggle `GOOGLE_AUTH_SHOW_PASSWORD_LOGIN`.
 - **T7** aprobación de pendientes (pkg `81fa3b7`, crm `7ea47588`). Rutas `['web','user']` prefijo `admin/google-auth`.
 
-**RETOMAR EN T8** (comando `google-auth:uninstall`). ⚠️ Su test hace `ALTER TABLE` (DDL NO transaccional en MariaDB) → **correr con backup** (`/tmp/krayin_backup_pre_oauth_1782929592.sql`) y **restaurar** el esquema después: `DELETE FROM migrations WHERE migration IN ('2026_06_29_100000_add_google_columns_to_users_table','2026_06_29_100100_seed_basico_role');` + `php artisan migrate --force`, luego verificar columnas+rol.
+~~RETOMAR EN T8~~ **SUPERADO 2026-07-02** — T8 y T9 completadas, review final hecha. ⚠️ Sigue vigente la mecánica del test de uninstall: hace `ALTER TABLE` (DDL NO transaccional en MariaDB) → correrlo ÚLTIMO y restaurar el esquema después: `DELETE FROM migrations WHERE migration IN ('2026_06_29_100000_add_google_columns_to_users_table','2026_06_29_100100_seed_basico_role');` + `php artisan migrate --force`, luego verificar columnas+rol. Backup durable: `/home/vallory/backups/krayin_backup_pre_t8_2026-07-02.sql` (el de /tmp se perdió en un reboot).
 
-**Después de T8:** T9 (README del paquete + suite final) → review whole-branch con **opus** (`superpowers:requesting-code-review`) → `superpowers:finishing-a-development-branch`.
-
-**🔴 PENDIENTE CRÍTICO:** la rama `feat/google-oauth-login` (laravel-crm) y el repo del paquete `KrayinGoogleAuth` están **SOLO LOCALES, sin pushear** → sin backup remoto. Pushear al retomar (o antes).
+~~🔴 PENDIENTE CRÍTICO: sin pushear~~ **RESUELTO 2026-07-02:** rama pusheada (PR #2) y paquete con repo remoto propio.
 
 **Datos de contexto ya verificados esta sesión (no re-explorar):** hook login = `admin.sessions.login.form_controls.before` (login.blade.php:25); rutas admin bajo prefijo `config('app.admin_path')` + middleware `['web','admin_locale','user']`; alias `user`=`Bouncer` (guest→redirect a `admin.session.create`, no 500); nombres de ruta `admin.session.create/store/destroy`, `admin.dashboard.index`; tests en `laravel-crm/tests` con namespace `Tests\Feature\*` (NO `CarlVallory\...\Tests` como decía el plan). Backup DB pre-trabajo: `/tmp/krayin_backup_pre_oauth_1782929592.sql`.
 
