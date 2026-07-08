@@ -65,11 +65,9 @@ return [
             'middleware' => [
                 // MuCi: en producción la doc de la API exige estar logueado (guard admin de Krayin).
                 // En local queda abierta para desarrollar sin fricción.
-                // 'web' + Bouncer ('user'): sin sesión redirige a admin.session.create;
-                // 'auth:user' rompía con "Route [login] not defined" (Krayin no nombra esa ruta).
-                'api'             => env('APP_ENV') === 'production' ? ['web', 'user'] : [],
+                'api'             => env('APP_ENV') === 'production' ? ['auth:user'] : [],
                 'asset'           => [],
-                'docs'            => env('APP_ENV') === 'production' ? ['web', 'user'] : [],
+                'docs'            => env('APP_ENV') === 'production' ? ['auth:user'] : [],
                 'oauth2_callback' => [],
             ],
 
