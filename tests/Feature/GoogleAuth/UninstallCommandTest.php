@@ -33,6 +33,31 @@ class UninstallCommandTest extends TestCase
     }
 
     /**
+     * tearDown restaura el esquema DESPUÉS de cada test.
+     * El happy-path dropea columnas y rol con DDL real (el commit implícito
+     * mata la transacción, así que lo borrado persiste): sin esta restauración,
+     * una corrida completa de la suite deja la BD compartida sin google_id /
+     * auth_provider / rol Básico y rompe todos los demás tests de GoogleAuth
+     * en la corrida siguiente. Ambas migraciones son idempotentes (guardas
+     * hasColumn / exists), y tras el commit implícito la conexión queda en
+     * autocommit: lo restaurado sobrevive al ROLLBACK de parent::tearDown().
+     */
+    protected function tearDown(): void
+    {
+        $migrations = base_path('packages/CarlVallory/KrayinGoogleAuth/src/Database/Migrations');
+
+        if (! Schema::hasColumn('users', 'google_id') || ! Schema::hasColumn('users', 'auth_provider')) {
+            (require $migrations . '/2026_06_29_100000_add_google_columns_to_users_table.php')->up();
+        }
+
+        if (! DB::table('roles')->where('name', 'Básico')->exists()) {
+            (require $migrations . '/2026_06_29_100100_seed_basico_role.php')->up();
+        }
+
+        parent::tearDown();
+    }
+
+    /**
      * Abort: rol de respaldo inexistente + usuarios con Básico → FAILURE, nada se toca.
      * No hace DDL, seguro con DatabaseTransactions.
      */
