@@ -12,6 +12,7 @@
         "barryvdh/laravel-dompdf": "^2.0.0",
         "carlvallory/krayin-financial-reports": "@dev",
         "carlvallory/krayin-formatter": "@dev",
+        "carlvallory/krayin-fundraising": "@dev",
         "carlvallory/krayin-google-auth": "@dev",
         "carlvallory/krayin-net-value": "@dev",
         "carlvallory/krayin-whatsapp": "@dev",

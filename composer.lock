@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "654828ec175efc82c4306ae4e21651f4",
+    "content-hash": "a94812440c59702e8e85b877b380c941",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -289,12 +289,48 @@
             }
         },
         {
+            "name": "carlvallory/krayin-fundraising",
+            "version": "dev-master",
+            "dist": {
+                "type": "path",
+                "url": "packages/CarlVallory/KrayinFundraising",
+                "reference": "159628daa000d170e48165a0664d71fe5470dc3e"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "CarlVallory\\KrayinFundraising\\Providers\\KrayinFundraisingServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "CarlVallory\\KrayinFundraising\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carl Vallory",
+                    "email": "carlos@muci.org"
+                }
+            ],
+            "description": "Fundraising prospects panel for Krayin CRM",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "carlvallory/krayin-google-auth",
-            "version": "2.1.x-dev",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinGoogleAuth",
-                "reference": "4fee8e5b3a160578fba18970e16cf31c97e25911"
+                "reference": "7645cf9d2b750fb7ae5f27dbaa5d61c081375900"
             },
             "require": {
                 "laravel/socialite": "^5.0"
@@ -334,7 +370,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinNetValue",
-                "reference": "be744fc67bd9b6dd816c2608d9e59a294ef0e9bc"
+                "reference": "b56a1ab5a472d3f54ec5189de559072b031f2859"
             },
             "type": "library",
             "extra": {
@@ -12550,6 +12586,7 @@
     "stability-flags": {
         "carlvallory/krayin-financial-reports": 20,
         "carlvallory/krayin-formatter": 20,
+        "carlvallory/krayin-fundraising": 20,
         "carlvallory/krayin-google-auth": 20,
         "carlvallory/krayin-net-value": 20,
         "carlvallory/krayin-whatsapp": 20,
