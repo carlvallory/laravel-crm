@@ -50,3 +50,23 @@ it('el controller responde JSON del grid ante una petición ajax', function () {
     $response->assertOk();
     $response->assertJsonStructure(['records']);
 });
+
+it('el buscador global del datagrid no rompe la consulta (columna name es un alias de GROUP BY)', function () {
+    $this->actingAs(\Webkul\User\Models\User::find(1), 'user');
+
+    // El toolbar del DataGrid de Webkul SIEMPRE renderiza un input de búsqueda global,
+    // que el frontend envía como `filters[all][]=<term>`. Si alguna columna del grid
+    // tiene `searchable => true` y su `index` es un alias de SELECT sobre una query con
+    // GROUP BY (como `name` en ProspectQuery), `processRequestedFilters()` arma un
+    // `orWhere('name', 'LIKE', ...)` que MySQL/MariaDB rechaza con
+    // SQLSTATE[42S22] "Unknown column 'name' in 'where clause'", porque los alias de
+    // SELECT no son válidos en WHERE. Este test reproduce exactamente esa ruta.
+    $response = $this->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])
+        ->getJson(route('krayin.fundraising.index', [
+            'ver' => 'personas',
+            'filters' => ['all' => ['grid']],
+        ]));
+
+    $response->assertOk();
+    $response->assertJsonStructure(['records']);
+});
