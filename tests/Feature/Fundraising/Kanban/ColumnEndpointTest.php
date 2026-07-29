@@ -30,6 +30,12 @@ it('rechaza crear columna sin nombre con 422', function () {
         ->assertStatus(422);
 });
 
+it('rechaza un color no-hex con 422 (evita inyección CSS)', function () {
+    $this->postJson(route('krayin.fundraising.kanban.columns.store'), [
+        'name' => 'Maliciosa', 'color' => 'red;position:fixed;top:0',
+    ])->assertStatus(422);
+});
+
 it('renombra una columna vía PATCH', function () {
     $column = KanbanColumn::orderBy('position')->first();
 
