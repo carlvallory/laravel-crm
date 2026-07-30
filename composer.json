@@ -15,6 +15,7 @@
         "carlvallory/krayin-fundraising": "@dev",
         "carlvallory/krayin-google-auth": "@dev",
         "carlvallory/krayin-net-value": "@dev",
+        "carlvallory/krayin-operations": "@dev",
         "carlvallory/krayin-whatsapp": "@dev",
         "carlvallory/krayin-woocommerce": "@dev",
         "diglactic/laravel-breadcrumbs": "^8.0",
