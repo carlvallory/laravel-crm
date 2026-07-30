@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a94812440c59702e8e85b877b380c941",
+    "content-hash": "a06255c5927d220903f265732a3f3819",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -213,12 +213,48 @@
             "time": "2023-12-11T17:09:12+00:00"
         },
         {
+            "name": "carlvallory/krayin-closed-at-fix",
+            "version": "dev-master",
+            "dist": {
+                "type": "path",
+                "url": "packages/CarlVallory/KrayinClosedAtFix",
+                "reference": "caaa2e59748b9f7d86d3ab0e5d796ef501817141"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "CarlVallory\\KrayinClosedAtFix\\Providers\\KrayinClosedAtFixServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "CarlVallory\\KrayinClosedAtFix\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carlos Vallory",
+                    "email": "carlos@muci.org"
+                }
+            ],
+            "description": "Preserva el closed_at enviado al crear leads won/lost (revierte el override incondicional del REST API core en el path de create).",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "carlvallory/krayin-financial-reports",
             "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinFinancialReports",
-                "reference": "9708348f9ee01844a3330790d6f66255b60bbdbb"
+                "reference": "c381ed20e946eb9523f69593ae289225319a4334"
             },
             "type": "library",
             "extra": {
@@ -294,7 +330,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinFundraising",
-                "reference": "159628daa000d170e48165a0664d71fe5470dc3e"
+                "reference": "0ce3c9572566e1d8d0e3ddfdc7b597e6a114f6ae"
             },
             "type": "library",
             "extra": {
@@ -396,6 +432,42 @@
                 }
             ],
             "description": "Krayin Custom Net Value Package",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "carlvallory/krayin-operations",
+            "version": "2.1.x-dev",
+            "dist": {
+                "type": "path",
+                "url": "packages/CarlVallory/KrayinOperations",
+                "reference": "26389561554704804c56d6b5ab5e366a944655b2"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "CarlVallory\\KrayinOperations\\Providers\\KrayinOperationsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "CarlVallory\\KrayinOperations\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carl Vallory",
+                    "email": "carlos@muci.org"
+                }
+            ],
+            "description": "Operations panel for Krayin CRM",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -12584,11 +12656,13 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
+        "carlvallory/krayin-closed-at-fix": 20,
         "carlvallory/krayin-financial-reports": 20,
         "carlvallory/krayin-formatter": 20,
         "carlvallory/krayin-fundraising": 20,
         "carlvallory/krayin-google-auth": 20,
         "carlvallory/krayin-net-value": 20,
+        "carlvallory/krayin-operations": 20,
         "carlvallory/krayin-whatsapp": 20,
         "carlvallory/krayin-woocommerce": 20,
         "krayin/krayin-package-generator": 20
