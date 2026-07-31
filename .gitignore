@@ -41,3 +41,4 @@ node_modules/
 # generados / cache (regenerables — no versionar)
 /.phpunit.cache
 /storage/api-docs
+/storage/fonts

@@ -10,10 +10,13 @@
     "require": {
         "php": "^8.1",
         "barryvdh/laravel-dompdf": "^2.0.0",
+        "carlvallory/krayin-closed-at-fix": "@dev",
         "carlvallory/krayin-financial-reports": "@dev",
         "carlvallory/krayin-formatter": "@dev",
+        "carlvallory/krayin-fundraising": "@dev",
         "carlvallory/krayin-google-auth": "@dev",
         "carlvallory/krayin-net-value": "@dev",
+        "carlvallory/krayin-operations": "@dev",
         "carlvallory/krayin-whatsapp": "@dev",
         "carlvallory/krayin-woocommerce": "@dev",
         "diglactic/laravel-breadcrumbs": "^8.0",
