@@ -14,6 +14,7 @@
         "carlvallory/krayin-formatter": "@dev",
         "carlvallory/krayin-google-auth": "@dev",
         "carlvallory/krayin-net-value": "@dev",
+        "carlvallory/krayin-ticket-sales": "@dev",
         "carlvallory/krayin-whatsapp": "@dev",
         "carlvallory/krayin-woocommerce": "@dev",
         "diglactic/laravel-breadcrumbs": "^8.0",

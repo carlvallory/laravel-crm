@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "654828ec175efc82c4306ae4e21651f4",
+    "content-hash": "17059ba84e5dd1248e549a4c0f396435",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -218,7 +218,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinFinancialReports",
-                "reference": "9708348f9ee01844a3330790d6f66255b60bbdbb"
+                "reference": "cdbcbdbaeb579bbe9be166d027148c0d6c634e00"
             },
             "type": "library",
             "extra": {
@@ -290,11 +290,11 @@
         },
         {
             "name": "carlvallory/krayin-google-auth",
-            "version": "2.1.x-dev",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinGoogleAuth",
-                "reference": "4fee8e5b3a160578fba18970e16cf31c97e25911"
+                "reference": "7645cf9d2b750fb7ae5f27dbaa5d61c081375900"
             },
             "require": {
                 "laravel/socialite": "^5.0"
@@ -334,7 +334,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinNetValue",
-                "reference": "be744fc67bd9b6dd816c2608d9e59a294ef0e9bc"
+                "reference": "b56a1ab5a472d3f54ec5189de559072b031f2859"
             },
             "type": "library",
             "extra": {
@@ -360,6 +360,42 @@
                 }
             ],
             "description": "Krayin Custom Net Value Package",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "carlvallory/krayin-ticket-sales",
+            "version": "2.1.x-dev",
+            "dist": {
+                "type": "path",
+                "url": "packages/CarlVallory/KrayinTicketSales",
+                "reference": "1c0b302d73d4f638a7bc4aaa6acad86cf2fb7b07"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "CarlVallory\\KrayinTicketSales\\Providers\\KrayinTicketSalesServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "CarlVallory\\KrayinTicketSales\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carlos Vallory",
+                    "email": "carlos@vallory.com"
+                }
+            ],
+            "description": "Dashboard de entradas vendidas del día (WooCommerce + FooEvents) para Krayin",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -12552,6 +12588,7 @@
         "carlvallory/krayin-formatter": 20,
         "carlvallory/krayin-google-auth": 20,
         "carlvallory/krayin-net-value": 20,
+        "carlvallory/krayin-ticket-sales": 20,
         "carlvallory/krayin-whatsapp": 20,
         "carlvallory/krayin-woocommerce": 20,
         "krayin/krayin-package-generator": 20
