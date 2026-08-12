@@ -23,6 +23,16 @@
 
 ---
 
+## Desviaciones encontradas al ejecutar (2026-08-12)
+
+Anotadas acá para que las tareas 2 a 7 no repitan el tropiezo:
+
+- **Laravel 12, no 11.** `create-project` sin versión trae **Laravel 13, que exige PHP ^8.3** y no arrancaría en el php-fpm 8.2 de producción. Se pide `laravel/laravel:^12.0`.
+- **En local se usa `php` (8.3), no `/usr/bin/php8.2`,** que no existe en la máquina de desarrollo. El `/usr/bin/php8.2` de los comandos de abajo aplica **solo en el servidor**.
+- **`composer config platform.php 8.2.99`.** Sin eso el lock resuelve paquetes que en prod no cargan; ya atajó a `laravel/pint` v1.30.5. No sacarlo.
+- **`install:api` arrastra Sanctum,** que el spec descartó. Hay que quitar el paquete, `config/sanctum.php` y la migración de `personal_access_tokens`.
+- **Pest 3 se instala a mano:** `php artisan pest:install` no existe; hay que crear `tests/Pest.php`.
+
 ## Estructura de archivos
 
 | Archivo | Responsabilidad |
