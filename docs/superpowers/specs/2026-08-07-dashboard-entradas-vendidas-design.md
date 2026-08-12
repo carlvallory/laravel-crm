@@ -2,8 +2,20 @@
 
 - **Fecha:** 2026-08-07
 - **Autor:** Carlos Vallory (con asistencia de Claude Code)
-- **Estado:** Aprobado — pendiente de plan de implementación
+- **Estado:** Vigente, con secciones superadas — ver aviso abajo
 - **Repo destino del código:** nuevo paquete `packages/CarlVallory/KrayinTicketSales` dentro de `laravel-crm`
+
+> **Superado en parte por `2026-08-12-servicio-fooevents-design.md`.**
+>
+> Las secciones **§4 (acceso a datos)**, **§5.2 (fuente de ventas)** y **§11
+> (errores)** ya no describen el sistema. El CRM no lee la base `muci`: hay un
+> servicio intermedio que es el único con esa credencial, y el CRM le pide filas
+> ya agregadas.
+>
+> Lo que sigue vigente: el objetivo (§1), el hallazgo de infraestructura (§2), la
+> restricción de no tocar el core (§3), las trampas del esquema (§5.1, §5.3,
+> §5.4), la zona horaria (§6), el refresco y el snapshot (§7), la interfaz (§8) y
+> el fuera de alcance (§9).
 
 ## 1. Objetivo
 
@@ -73,9 +85,9 @@ Se usa esta fuente y **no** los tickets, porque una función con cero ventas no 
              "dateKey_add_date": "agosto 1, 2026", "dateKey_stock": "3"}}
 ```
 
-Un parser que solo entienda la forma A **pierde 4 de los 7 shows del día**. Medido sobre la base real: 47 slots están en forma A y **17 en forma B**. El 2026-08-07, ignorar la forma B ocultaba los productos 194055, 194099, 194154 y 194339 — incluido el de mayor venta del día.
+Un parser que solo entienda la forma A **pierde 4 de los 7 shows del día**. Reparto verificado el 2026-08-10 contra el volcado de los 18 productos `dateslot` publicados: **11 en forma A, 5 en forma B y 2 con la meta vacía**. Ningún tercer formato. El 2026-08-07, ignorar la forma B ocultaba los productos 194055, 194099, 194154 y 194339 — incluido el de mayor venta del día.
 
-El parser soporta ambas y elige por presencia de la clave `add_date`. Esto no es una precaución teórica: es la diferencia entre mostrar 4 shows y mostrar 7.
+El parser soporta ambas y elige por presencia de la clave `add_date`. Esto no es una precaución teórica: es la diferencia entre mostrar 3 shows y mostrar 7.
 
 Notas adicionales del formato:
 - En la forma B no hay `formatted_time`; se compone desde `hour`/`minute` (+ `period` si estuviera).
@@ -228,7 +240,7 @@ La programación completa del día, parseando **ambas formas** de JSON, es de **
 | 194154 Misterios de tu Cerebro | Entrada general (09:30) | 0 |
 | 194339 Las Constelaciones y el Zodíaco | Entrada 2x1 (17:00) | 0 |
 
-**Prueba de aceptación del parser dual:** si la primera corrida devuelve 7 funciones sobre 4 shows en vez de 11 sobre 7, el parser está ignorando la forma B (§5.1).
+**Prueba de aceptación del parser dual:** si la primera corrida devuelve 7 funciones sobre 3 shows en vez de 11 sobre 7, el parser está ignorando la forma B (§5.1). Verificado el 2026-08-10; una versión anterior de este documento decía "7 sobre 4" y estaba mal.
 
 Las 5 funciones sin ventas (Bioestanque 17:00, y los slots de 193817, 194055, 194154, 194339 sin movimiento) **deben aparecer en cero**, no desaparecer.
 
