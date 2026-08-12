@@ -376,7 +376,26 @@ contra la caja del día, la neta la que sirve para contabilidad.
 | Tickets que hoy viven en un pedido `wc-reagendado` | 4 |
 | Tickets cuyo `post_modified` es anterior al reagendamiento | **4 de 4** |
 
-### 6.4 Estados de pedido presentes
+### 6.4 Llave de unión y cobertura de metas
+
+La llave sigue siendo `producto_id + fecha + slot`, con
+`slot = trim(label) + " " + formatted_time`. Verificada de nuevo hoy contra el
+2026-08-07: 192637 da 2 entradas en `BioEstanque (16:00) (17:00)` y 2 en
+`BioEstanque (18:00) (19:00)`, que es exactamente lo que registra §13 del diseño
+del 2026-08-07.
+
+Se evaluó y **descartó** usar `WooCommerceEventsBookingSlotID` +
+`WooCommerceEventsBookingDateID` como llave, que serían inmunes a renombres de
+label: el `slot_id` aparece en el JSON del producto en 5589 de 5600 tickets
+(99,8%), pero el `date_id` solo en 4317 (77%), porque el JSON va perdiendo las
+fechas pasadas y un ticket viejo apunta a una clave que ya no existe. Queda
+anotado por si renombrar labels se vuelve un problema real.
+
+**87 de 16.482 tickets no tienen `WooCommerceEventsBookingDateMySQLFormat` ni
+`WooCommerceEventsBookingSlot`** (0,5%): son productos sin bookings. El servicio
+los descarta — no son funciones.
+
+### 6.5 Estados de pedido presentes
 
 Histórico completo: `wc-completed` (38.556), `wc-cancelled` (5561),
 `wc-refunded` (23), `wc-reagendado` (5), `wc-pending` (1).
