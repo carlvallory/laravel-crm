@@ -6,13 +6,13 @@
 
 **Architecture:** Laravel liviano, sin base propia, stateless. Una conexión de solo lectura a `muci`. Un repositorio devuelve filas crudas, tres clases puras hacen todo el parseo y la agregación, un controlador serializa. Escucha en `127.0.0.1:8081` detrás de nginx.
 
-**Tech Stack:** PHP 8.2, Laravel 11, Pest, MySQL (solo lectura), nginx + php-fpm.
+**Tech Stack:** PHP 8.4, Laravel 12, Pest, MySQL (solo lectura), nginx + php-fpm.
 
 **Spec:** `docs/superpowers/specs/2026-08-12-servicio-fooevents-design.md`
 
 ## Global Constraints
 
-- **PHP 8.2 explícito.** En el servidor, todo `composer`/`artisan` se corre con `/usr/bin/php8.2`. El `php` del CLI es un 8.5 incompleto sin `pdo_mysql`.
+- **PHP 8.4 explícito.** En el servidor, todo `composer`/`artisan` se corre con `/usr/bin/php8.4`. El `php` del CLI es un 8.5 incompleto sin `pdo_mysql`.
 - **La base `muci` es de solo lectura.** Usuario `anthropic_readonly`, grant `SELECT` puro. Ningún `Model::save()`, ninguna migración sobre esa conexión.
 - **`CURDATE()` y `NOW()` están prohibidos** en toda consulta. La fecha siempre entra como parámetro.
 - **Prefijo de tablas `wpzv_`.** HPOS activo: los pedidos están en `wpzv_wc_orders`, no en `wpzv_posts`.
@@ -27,9 +27,9 @@
 
 Anotadas acá para que las tareas 2 a 7 no repitan el tropiezo:
 
-- **Laravel 12, no 11.** `create-project` sin versión trae **Laravel 13, que exige PHP ^8.3** y no arrancaría en el php-fpm 8.2 de producción. Se pide `laravel/laravel:^12.0`.
-- **En local se usa `php` (8.3), no `/usr/bin/php8.2`,** que no existe en la máquina de desarrollo. El `/usr/bin/php8.2` de los comandos de abajo aplica **solo en el servidor**.
-- **`composer config platform.php 8.2.99`.** Sin eso el lock resuelve paquetes que en prod no cargan; ya atajó a `laravel/pint` v1.30.5. No sacarlo.
+- **Laravel 12, no 11.** `create-project` sin versión trae **Laravel 13, que exige PHP ^8.3** y no arrancaría en el php-fpm 8.2 que producción tenía entonces. Se pide `laravel/laravel:^12.0`.
+- **En local se usa `php` (8.3), no `/usr/bin/php8.4`,** que no existe en la máquina de desarrollo. El `/usr/bin/php8.4` de los comandos de abajo aplica **solo en el servidor**.
+- **`composer config platform.php 8.2.99`.** Sin eso el lock resuelve paquetes que en prod no cargan; ya atajó a `laravel/pint` v1.30.5. **Superado:** el pin está en `8.4.99` desde el 2026-08-13, ver la sección de abajo.
 - **`install:api` arrastra Sanctum,** que el spec descartó. Hay que quitar el paquete, `config/sanctum.php` y la migración de `personal_access_tokens`.
 - **Pest 3 se instala a mano:** `php artisan pest:install` no existe; hay que crear `tests/Pest.php`.
 
@@ -51,6 +51,64 @@ Anotadas acá para que las tareas 2 a 7 no repitan el tropiezo:
   sobrevivía a toda la suite. Importa porque la Task 4 convierte `descartadas`
   en el aviso `fecha_no_parseable`: sin el guard, un slot sin clave `date`
   avisaría sobre una cadena vacía, que no le da a nadie nada que corregir.
+
+## Cambio de plataforma: producción pasa a PHP 8.4 (2026-08-13)
+
+Decisión de Carlos. **Supersede el objetivo 8.2** de las dos secciones de arriba;
+lo que dicen sobre por qué se eligió Laravel 12 y por qué existe el pin sigue
+siendo válido como historia, pero el número cambió. Todos los
+`/usr/bin/php8.2` de este plan ya pasaron a `/usr/bin/php8.4`, y el socket del
+pool también.
+
+Estado real del parque al 2026-08-13:
+
+| Dónde | Versión | Nota |
+|---|---|---|
+| WordPress/WooCommerce (prod) | **8.4** | Ya está ahí. Implica que `php8.4-fpm` ya existe en esa máquina. |
+| CRM Krayin (prod) | 8.2 | Carlos lo quiere subir a 8.4; todavía no pasó. |
+| CLI del servidor | 8.5 | **Incompleto, sin `pdo_mysql`.** Nunca usar `php` a secas allá. |
+| Máquina de desarrollo | 8.3 (`php`) y **8.4 con paridad completa** | Desarrollar con `/usr/bin/php8.4`. |
+
+**El servicio no depende del upgrade de Krayin.** Tiene vhost y pool propios, así
+que puede correr en `php8.4-fpm` mientras Krayin sigue en 8.2. Verificar en la
+Task 7 que el pool 8.4 esté realmente instalado, no darlo por hecho.
+
+**El 8.4 local se igualó al 8.3 y el pin ya se movió** (commit `60bb370` del
+servicio). El `php8.4` venía pelado —le faltaban 20 extensiones, entre ellas
+`mbstring`, que `SpanishDateParser` usa en `mb_strtolower()`, y
+`sqlite3`/`pdo_sqlite`, sobre los que el `phpunit.xml` corre la suite—. Se
+instaló el espejo exacto de los `php8.3-*`:
+
+    sudo apt install php8.4-bcmath php8.4-bz2 php8.4-curl php8.4-fpm \
+                     php8.4-gd php8.4-imagick php8.4-intl php8.4-mbstring \
+                     php8.4-mysql php8.4-soap php8.4-sqlite3 php8.4-xml php8.4-zip
+
+Hoy la paridad de extensiones entre 8.3 y 8.4 es total, en los dos sentidos.
+`config.platform.php` quedó en **`8.4.99`** y `require.php` en **`^8.4`**.
+
+**Desarrollar con `/usr/bin/php8.4`, no con `php`.** El `php` de la máquina de
+desarrollo sigue siendo 8.3, así que dev y prod solo coinciden si se invoca el
+8.4 explícito. Los `Run:` de este plan ya dicen `/usr/bin/php8.4` y ahora aplican
+igual en local y en el servidor.
+
+Qué se movió en el lock al reapuntar: `laravel/pint` 1.30.4 → 1.30.5 (el paquete
+que el pin viejo atajaba) y varios componentes de Symfony de 7.4 a 8.1.
+`laravel/framework` se quedó en 12.66.0 y `symfony/console` en 7.4.16.
+`laravel/tinker` **no** subió a 3.x: ese mayor pide Laravel 13, no era el pin.
+La suite quedó 26/26 en verde bajo 8.4, sin deprecations.
+
+**Pint reporta `fail`,** y se dejó así a propósito: quiere reformatear 8 archivos,
+incluidos los dos parsers migrados, porque su preset por defecto no coincide con
+el estilo que traen del CRM. Nunca se corrió pint en este repo y no hay
+`pint.json`. Si se adopta, es su propia tarea y arranca por escribir ese config.
+
+**Task 5 desbloqueada por partida doble:** necesita `pdo_mysql`, que ahora está
+tanto en el 8.3 como en el 8.4 local.
+
+Laravel 13 queda habilitado (exige ^8.3), pero **no se migra**: Laravel 12 es
+soportado y corre en 8.4, el servicio tiene 4 commits, y un salto de mayor del
+framework agrega riesgo sin darle nada a este servicio. Si algún día se hace, es
+su propia tarea.
 
 ## Estructura de archivos
 
@@ -89,7 +147,7 @@ Al terminar esta tarea el endpoint responde `401`, `422` y `200` correctamente, 
 - [ ] **Step 1: Crear el esqueleto**
 
 ```bash
-/usr/bin/php8.2 /usr/local/bin/composer create-project laravel/laravel servicio-fooevents
+/usr/bin/php8.4 /usr/local/bin/composer create-project laravel/laravel servicio-fooevents
 cd servicio-fooevents && git init && git add -A && git commit -m "chore: esqueleto laravel"
 ```
 
@@ -168,7 +226,7 @@ test('200 devuelve la forma completa', function () {
 
 - [ ] **Step 4: Correr y verificar que fallan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Feature/FuncionesEndpointTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Feature/FuncionesEndpointTest.php`
 Expected: FAIL — la ruta no existe (404 en todos).
 
 - [ ] **Step 5: Implementar el middleware**
@@ -262,14 +320,14 @@ Route::middleware('token')->get('/v1/funciones', FuncionesController::class);
 ```
 
 > Nota: en Laravel 11 hay que habilitar las rutas de API con
-> `/usr/bin/php8.2 artisan install:api`, o registrar `routes/api.php` a mano en
+> `/usr/bin/php8.4 artisan install:api`, o registrar `routes/api.php` a mano en
 > `bootstrap/app.php`. Sin eso la ruta no existe y los tests siguen en 404.
 > El prefijo `api` por defecto debe quitarse: la ruta es `/v1/funciones`, no
 > `/api/v1/funciones`.
 
 - [ ] **Step 7: Correr y verificar que pasan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Feature/FuncionesEndpointTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Feature/FuncionesEndpointTest.php`
 Expected: PASS, 5 tests.
 
 - [ ] **Step 8: Commit**
@@ -312,7 +370,7 @@ En `tests/Unit/BookingsOptionsParserTest.php`, la ruta de los fixtures pasa de `
 
 - [ ] **Step 2: Correr los tests migrados sin tocar la lógica**
 
-Run: `/usr/bin/php8.2 artisan test tests/Unit`
+Run: `/usr/bin/php8.4 artisan test tests/Unit`
 Expected: PASS. Si la prueba de aceptación `11 funciones sobre 7 shows` no queda en verde, **parar**: la mudanza perdió algo y no hay que seguir.
 
 - [ ] **Step 3: Commit de la mudanza limpia**
@@ -372,7 +430,7 @@ test('un slot sin horario tiene hora null', function () {
 
 - [ ] **Step 5: Correr y verificar que fallan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Unit/BookingsOptionsParserTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Unit/BookingsOptionsParserTest.php`
 Expected: FAIL con "Undefined array key \"hora\"".
 
 - [ ] **Step 6: Implementar `hora`**
@@ -419,7 +477,7 @@ expect($this->parser->parse($json))->toBe([
 
 - [ ] **Step 8: Correr toda la suite**
 
-Run: `/usr/bin/php8.2 artisan test`
+Run: `/usr/bin/php8.4 artisan test`
 Expected: PASS. La prueba de aceptación `11 funciones sobre 7 shows` sigue verde.
 
 - [ ] **Step 9: Commit**
@@ -500,7 +558,7 @@ public function parse(?string $json): array
 
 - [ ] **Step 12: Correr toda la suite y commitear**
 
-Run: `/usr/bin/php8.2 artisan test`
+Run: `/usr/bin/php8.4 artisan test`
 Expected: PASS. Los tests migrados no cambian: siguen usando `parse()`.
 
 ```bash
@@ -569,7 +627,7 @@ test('funciones con cero entradas reciben cero', function () {
 
 - [ ] **Step 2: Correr y verificar que fallan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Unit/ProrrateoTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Unit/ProrrateoTest.php`
 Expected: FAIL con "Class App\Support\Prorrateo not found".
 
 - [ ] **Step 3: Implementar**
@@ -634,7 +692,7 @@ class Prorrateo
 
 - [ ] **Step 4: Correr y verificar que pasan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Unit/ProrrateoTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Unit/ProrrateoTest.php`
 Expected: PASS, 6 tests.
 
 - [ ] **Step 5: Commit**
@@ -796,7 +854,7 @@ test('el título se limpia del espacio duro', function () {
 
 - [ ] **Step 2: Correr y verificar que fallan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Unit/FuncionesDelDiaTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Unit/FuncionesDelDiaTest.php`
 Expected: FAIL con "Class App\Services\FuncionesDelDia not found".
 
 - [ ] **Step 3: Implementar**
@@ -942,12 +1000,12 @@ class FuncionesDelDia
 
 - [ ] **Step 4: Correr y verificar que pasan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Unit/FuncionesDelDiaTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Unit/FuncionesDelDiaTest.php`
 Expected: PASS, 8 tests.
 
 - [ ] **Step 5: Correr toda la suite**
 
-Run: `/usr/bin/php8.2 artisan test`
+Run: `/usr/bin/php8.4 artisan test`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -1047,7 +1105,7 @@ test('las líneas de un par pedido+producto traen neto y bruto enteros', functio
 
 - [ ] **Step 2: Correr y verificar que fallan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Feature/FooEventsRepositoryTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Feature/FooEventsRepositoryTest.php`
 Expected: FAIL con "Class App\Repositories\FooEventsRepository not found". En local, si la base no está, deben aparecer como **skipped** una vez creada la clase.
 
 - [ ] **Step 3: Implementar**
@@ -1196,7 +1254,7 @@ class FooEventsRepository
 
 - [ ] **Step 4: Correr los tests**
 
-Run: `/usr/bin/php8.2 artisan test tests/Feature/FooEventsRepositoryTest.php`
+Run: `/usr/bin/php8.4 artisan test tests/Feature/FooEventsRepositoryTest.php`
 Expected en local: 4 SKIPPED. Expected en el servidor: PASS.
 
 - [ ] **Step 5: Correr contra la base real desde el servidor**
@@ -1204,7 +1262,7 @@ Expected en local: 4 SKIPPED. Expected en el servidor: PASS.
 ```bash
 ssh -i ~/.ssh/muci anthropic_readonly@muci.org
 # con el repo desplegado y el .env apuntando a muci:
-/usr/bin/php8.2 artisan test tests/Feature/FooEventsRepositoryTest.php
+/usr/bin/php8.4 artisan test tests/Feature/FooEventsRepositoryTest.php
 ```
 
 Expected: PASS, incluida `el 2026-08-07 hay 26 entradas completadas sobre 6 funciones`. Si ese test falla, **parar**: el cruce está mal y todo lo que sigue hereda el error.
@@ -1370,7 +1428,7 @@ test('la respuesta canónica del fixture coincide con la que produce el servicio
 
 - [ ] **Step 2: Correr y verificar que fallan**
 
-Run: `/usr/bin/php8.2 artisan test tests/Feature`
+Run: `/usr/bin/php8.4 artisan test tests/Feature`
 Expected: FAIL — el controlador todavía devuelve `funciones: []` siempre.
 
 - [ ] **Step 3: Implementar el controlador**
@@ -1477,7 +1535,7 @@ Agregar los `use` de `App\Repositories\FooEventsRepository`, `App\Services\Funci
 
 - [ ] **Step 4: Correr y verificar que pasan**
 
-Run: `/usr/bin/php8.2 artisan test`
+Run: `/usr/bin/php8.4 artisan test`
 Expected: PASS, toda la suite.
 
 - [ ] **Step 5: Commit**
@@ -1517,7 +1575,7 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php8.2-fpm-servicio-fooevents.sock;
+        fastcgi_pass unix:/run/php/php8.4-fpm-servicio-fooevents.sock;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
     }
@@ -1536,15 +1594,15 @@ sudo mkdir -p /var/www/servicio-fooevents
 sudo chown -R www-data:www-data /var/www/servicio-fooevents
 # clonar el repo ahí, y después:
 cd /var/www/servicio-fooevents
-/usr/bin/php8.2 /usr/local/bin/composer install --no-dev --optimize-autoloader
-cp .env.example .env && /usr/bin/php8.2 artisan key:generate
+/usr/bin/php8.4 /usr/local/bin/composer install --no-dev --optimize-autoloader
+cp .env.example .env && /usr/bin/php8.4 artisan key:generate
 # completar en .env: FOOEVENTS_TOKEN, MUCI_DB_USERNAME, MUCI_DB_PASSWORD
-/usr/bin/php8.2 artisan config:cache
+/usr/bin/php8.4 artisan config:cache
 sudo ln -s /etc/nginx/sites-available/servicio-fooevents /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-El token se genera con `/usr/bin/php8.2 -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'` y va idéntico en los dos `.env`.
+El token se genera con `/usr/bin/php8.4 -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'` y va idéntico en los dos `.env`.
 
 - [ ] **Step 3: Verificar que el endpoint responde y que está cerrado desde afuera**
 
@@ -1566,7 +1624,7 @@ Expected: `200`, `401`, y fallo de conexión desde afuera. Si el tercero respond
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
-  'http://127.0.0.1:8081/v1/funciones?fecha=2026-08-07' | /usr/bin/php8.2 -r '
+  'http://127.0.0.1:8081/v1/funciones?fecha=2026-08-07' | /usr/bin/php8.4 -r '
 $r = json_decode(stream_get_contents(STDIN), true);
 printf("funciones: %d | entradas: %d | avisos: %d\n",
     count($r["funciones"]),
@@ -1580,7 +1638,7 @@ Si dan 7 funciones, el parser está ignorando la forma B. Si dan 6, la programac
 
 - [ ] **Step 5: Escribir el README con el procedimiento**
 
-Documentar en `README.md`: qué hace el servicio, la verificación del Step 4 con la advertencia de que **los números se mueven** —contrastar contra la base en el momento, no contra la tabla—, y el recordatorio de `/usr/bin/php8.2` explícito.
+Documentar en `README.md`: qué hace el servicio, la verificación del Step 4 con la advertencia de que **los números se mueven** —contrastar contra la base en el momento, no contra la tabla—, y el recordatorio de `/usr/bin/php8.4` explícito.
 
 - [ ] **Step 6: Commit**
 
