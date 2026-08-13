@@ -110,6 +110,32 @@ soportado y corre en 8.4, el servicio tiene 4 commits, y un salto de mayor del
 framework agrega riesgo sin darle nada a este servicio. Si algún día se hace, es
 su propia tarea.
 
+## Desviaciones encontradas al ejecutar (Task 3, 2026-08-13)
+
+- **`repartir()` va en enteros, no en punto flotante.** El plan calculaba
+  `$total * $n / $totalEntradas` y sacaba piso y resto de un float. Para los
+  montos de esta base da lo mismo, pero la promesa de la clase es que no se
+  pierde un guaraní, y con `intdiv()` y `%` eso no necesita un argumento sobre
+  precisión de 53 bits para creerse. El contrato público no cambia.
+- **Dos tests más que los del plan, los dos por mutaciones que sobrevivían.** Los
+  6 tests del Step 1 no distinguían el algoritmo decidido de dos impostores:
+  - Poner **todos los restos en 0** dejaba la suite verde. El test `el resto va a
+    la función con mayor resto` pasaba por casualidad, porque ahí la de mayor
+    resto es además la primera de la lista y el desempate por orden de inserción
+    da el mismo número. Lo cubre `el guaraní suelto va al mayor resto aunque no
+    sea el primero`.
+  - Usar **la cantidad de entradas en lugar del resto** también dejaba la suite
+    verde, y son criterios distintos: `(total * n) % totalEntradas` no crece con
+    `n`. Con 100 entre 7 entradas, la función con 3 entradas deja resto 6 y la de
+    4 deja resto 1, así que gana la que menos vendió. Lo cubre `gana el mayor
+    resto, no la que más entradas vendió`.
+- **Se agregó `un empate de restos lo gana la función que vino primero`,** que
+  fija el desempate. El sort de PHP es estable desde la 8.0; sin un test eso es
+  un detalle de implementación del que dependería la reproducibilidad.
+- **`$entradas === []` es redundante** y se dejó igual. `array_sum([])` es `0`,
+  así que `$totalEntradas <= 0` ya cubre el arreglo vacío; quitarla no rompe
+  ningún test. Queda porque documenta el caso explícito.
+
 ## Estructura de archivos
 
 | Archivo | Responsabilidad |
