@@ -23,7 +23,7 @@
 
 ---
 
-## Desviaciones encontradas al ejecutar (2026-08-12)
+## Desviaciones encontradas al ejecutar (Task 1, 2026-08-12)
 
 Anotadas acá para que las tareas 2 a 7 no repitan el tropiezo:
 
@@ -32,6 +32,25 @@ Anotadas acá para que las tareas 2 a 7 no repitan el tropiezo:
 - **`composer config platform.php 8.2.99`.** Sin eso el lock resuelve paquetes que en prod no cargan; ya atajó a `laravel/pint` v1.30.5. No sacarlo.
 - **`install:api` arrastra Sanctum,** que el spec descartó. Hay que quitar el paquete, `config/sanctum.php` y la migración de `personal_access_tokens`.
 - **Pest 3 se instala a mano:** `php artisan pest:install` no existe; hay que crear `tests/Pest.php`.
+
+## Desviaciones encontradas al ejecutar (Task 2, 2026-08-13)
+
+- **`SpanishDateParserTest.php` también glob-ea los fixtures.** El Step 1 solo
+  manda arreglar la ruta en `BookingsOptionsParserTest.php`, pero el test
+  `parsea todas las cadenas de fecha reales de la base` tiene el mismo
+  `__DIR__ . '/../../Fixtures/'`. Hay que arreglar los dos archivos.
+- **Los fixtures son 19 archivos, no 18:** los 18 `bookings_*.json` más
+  `products.json`. El `cp *.json` del Step 1 los trae todos, así que no cambia
+  nada, pero el conteo del plan no cuadra con `ls`.
+- **El Step 5 no falla como dice.** Esperaba `FAIL` con "Undefined array key
+  hora"; en PHP 8.3 la clave ausente es un *warning* y evalúa a `null`, así que
+  fallan 2 de los 3 tests nuevos y `un slot sin horario tiene hora null` pasa en
+  vacío. Después de implementar pasa por el motivo correcto y el warning se va.
+- **Un test más que los del plan:** `una fecha ausente no se avisa como
+  ilegible`. Una mutación que borra solo el guard `trim(...) !== ''` del Step 11
+  sobrevivía a toda la suite. Importa porque la Task 4 convierte `descartadas`
+  en el aviso `fecha_no_parseable`: sin el guard, un slot sin clave `date`
+  avisaría sobre una cadena vacía, que no le da a nadie nada que corregir.
 
 ## Estructura de archivos
 
