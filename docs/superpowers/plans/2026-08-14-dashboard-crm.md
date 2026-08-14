@@ -164,6 +164,47 @@ Se **borran**: `src/Support/BookingsOptionsParser.php`, `src/Support/SpanishDate
 
 ---
 
+## Desviaciones encontradas al ejecutar (Task 4, 2026-08-14)
+
+- **Dos tests del plan no compilaban con la realidad de `Http::fake`, y fallaban
+  en el Step 5.** `un 503 falla el comando...` y `una respuesta malformada...`
+  llaman `Http::fake()` **dos veces** en el mismo test, esperando que la segunda
+  reemplace a la primera. **No la reemplaza: las acumula y gana el primer stub que
+  matchea** (medido con una sonda). O sea que el segundo `artisan` recibía otra vez
+  el 200 bueno y salía exitoso. Se reescribieron con **una sola `Http::fake` con
+  `Http::sequence()`**, como ya hacen los tests de la Task 2. Ojo con el conteo de
+  la secuencia: el del 503 necesita **tres** respuestas (200, 503, 503) porque el
+  cliente reintenta; el de la malformada solo dos, porque un 200 no se reintenta.
+  Vale para cualquier test futuro que haga dos syncs seguidos.
+- **Siete de los nueve mapeos de `escribir()` se podían intercambiar con la suite
+  en verde.** El barrido campo por campo que el Step 7 recomienda —y que vale cada
+  minuto— dio: solo `producto_id` y `cupos_habilitados` estaban cubiertos.
+  Sobrevivían `show_nombre <- slot`, `slot <- show`, `hora <- null`,
+  `entradas_vendidas <- entradas_reagendadas` y su inverso, y **`recaudacion_neta
+  <- recaudacion_bruta` y su inverso** — el tablero habría mostrado plata
+  equivocada sin que nada se quejara. El plan solo anticipaba el de `show_nombre`.
+  **Test agregado** (no lo pedía el plan): `cada campo del contrato aterriza en su
+  columna y no en la de al lado`, con los nueve valores distintos entre sí —
+  `entradas_reagendadas` en **5**, no en 0, que es lo que separa los dos conteos.
+  Mata los nueve. Es el test que le faltaba al plan del servicio.
+- **Por eso la Task 4 cierra con 12 tests, no 11,** y el total del plan queda en
+  **64**.
+- **La Mutación 5 (sin `DB::transaction`) sobrevivió, como el plan anticipó.** Se
+  deja: matarla pide simular una falla a mitad de escritura. La atomicidad la
+  sostiene la revisión de código.
+- **La Mutación 7 (`'<'` por `'<='`) también sobrevivió, como el plan anticipó.** No
+  se persigue: es un borde de un día en una purga de retención.
+- **La Mutación 3 (SUCCESS en el `catch`) mata tres tests, no dos:** se lleva
+  también `un 401 se loguea como error, no como warning`, porque ese test asserta
+  `assertFailed()`.
+- **Al mutar, cuidado con los `perl -0pi -e` que anclan en texto acentuado**
+  ("Falló la sincronización"): no matchean y el comando sale en silencio sin
+  aplicar la mutación, que se lee igual que "sobrevivió". Anclar en texto sin
+  acentos y **verificar con un `grep` que la mutación entró** antes de creerle al
+  resultado.
+
+---
+
 ### Task 1: Retirar el acceso directo a `muci`
 
 El paquete deja de tener la credencial y deja de tener los parsers, que ahora viven en el servicio. Es una task de borrado: la única forma de verificar que no rompió nada es que lo que queda siga verde.
