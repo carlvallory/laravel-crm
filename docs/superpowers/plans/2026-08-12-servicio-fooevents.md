@@ -187,6 +187,32 @@ favor de `mariadb`. La conexión usa `'driver' => 'mysql'`, que funciona bien
 contra MariaDB; se anota por si alguna vez conviene el driver `mariadb` de
 Laravel.
 
+## Desviaciones encontradas al ejecutar (Task 6, 2026-08-14)
+
+- **Los tests que ya existían no tenían mock del repositorio.** `200 devuelve la
+  forma completa`, de la Task 1, pasaba porque el controlador no leía nada; en
+  cuanto lee, sin mock se va a 503. Se agregó un helper `repoVacio()` y se lo puso
+  a ese test. El Step 2 solo avisa que los tests **nuevos** fallan, no que uno
+  viejo se rompe.
+- **Tres de los tests nuevos pasan en vacío antes de implementar** (`la meta vacía
+  no genera aviso`, `un JSON válido sin ninguna función se saltea sin avisar`, `una
+  fecha sin funciones devuelve 200`), porque el controlador devolvía todo vacío.
+  Pasan por el motivo correcto después.
+- **Un test más, el más importante que faltaba: `devuelve solo las funciones de la
+  fecha pedida`.** Borrar el filtro `$f['date'] !== $fecha` sobrevivía a toda la
+  suite, porque ningún producto mockeado tenía funciones en otra fecha. Es el
+  corazón del contrato —`fecha` obligatoria y sin default— y sin ese test el
+  tablero podía mostrar la programación de todos los días juntos.
+- **Dos mutaciones que parecían sobrevivir y eran equivalentes**, anotadas para no
+  volver a perseguirlas:
+  - Cambiar `catch (QueryException)` por `catch (RuntimeException)` **sigue
+    atrapando**: `QueryException` extiende `PDOException`, que extiende
+    `RuntimeException`. Para probar el 503 hay que mutar a una clase fuera de esa
+    jerarquía, como `DomainException`.
+  - Quitar el filtro `wc-completed` al armar `$pares` no cambia la salida: son
+    pares de más para `lineasDe()`, y `armar()` prorratea solo sobre los pares de
+    tickets completados. Es una consulta más ancha, no un resultado distinto.
+
 ## Estructura de archivos
 
 | Archivo | Responsabilidad |
