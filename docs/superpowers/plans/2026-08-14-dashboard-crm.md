@@ -205,6 +205,32 @@ Se **borran**: `src/Support/BookingsOptionsParser.php`, `src/Support/SpanishDate
 
 ---
 
+## Desviaciones encontradas al ejecutar (Task 5, 2026-08-14)
+
+- **La Mutación 6 sobrevivió: el test del reloj corrido usaba un desfase
+  demasiado chico.** Sacar el `false` de `diffInMinutes($ahora, false)` no mataba
+  `un synced_at en el futuro no se toma como viejo`, porque el test usa **+5
+  minutos** y en Carbon 2.73 `diffInMinutes()` sin el `false` devuelve el valor
+  **absoluto**: da 5, que igual queda por debajo del umbral de 15. Los dos
+  criterios coinciden ahí y se separan solo con un desfase **mayor que el umbral**
+  — con signo, +40 minutos da -40 (no es viejo); sin signo, 40 (viejo), y el
+  tablero pondría la banda de dato viejo sobre un dato recién traído. Verificado
+  con una sonda: `nesbot/carbon 2.73.0`, `diffInMinutes($a)` = 5 y
+  `diffInMinutes($a, false)` = -5.
+  **Test reforzado** (mismo test, no uno nuevo): ahora asserta primero el desfase
+  de **40** minutos y después el de 5. Mata la Mutación 6.
+  Ojo para cuando el CRM suba de Carbon: **en Carbon 3 el default se invierte** y
+  `diffInMinutes()` pasa a devolver un float con signo. El `false` explícito sigue
+  siendo correcto en las dos versiones; el que hay que releer ese día es el
+  comentario del código, no la condición.
+- **Las otras siete murieron**, cada una incluyendo el test que el plan predecía.
+  Tres se llevan más de uno: M1 y M3 matan tres cada una, porque los tres tests de
+  precedencia de `OTRO_DIA` se apoyan en el mismo guard.
+- **La Task 5 cierra con los 12 tests del plan.** No se agregó ninguno: el arreglo
+  fue fortalecer uno. El total del plan sigue en **64**.
+
+---
+
 ### Task 1: Retirar el acceso directo a `muci`
 
 El paquete deja de tener la credencial y deja de tener los parsers, que ahora viven en el servicio. Es una task de borrado: la única forma de verificar que no rompió nada es que lo que queda siga verde.
