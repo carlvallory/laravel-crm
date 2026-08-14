@@ -2382,19 +2382,18 @@ Pest. La verificación en producción es el chequeo de números del `sync`.
 - [ ] **Step 2: Actualizar el `CLAUDE.md` del paquete**
 
 El `CLAUDE.md` sigue describiendo un paquete que lee `muci` directo. Estas son
-las secciones concretas a corregir (verificado el 2026-08-14):
+las secciones concretas a corregir (referenciadas por título, no por línea):
 
-| Línea | Qué dice hoy | Qué va en su lugar |
-|---|---|---|
-| ~25 | «Las cuatro trampas de la base `muci`» | Se **elimina la sección entera**. Esas trampas son ahora responsabilidad del servicio y están documentadas en su repo; repetirlas acá invita a que alguien vuelva a consultar la base desde el CRM |
-| ~75–76 | «Solo lectura sobre `muci`: el grant de `anthropic_readonly` es `SELECT` puro» | «El CRM **no tiene** credencial de `muci`. La única forma de llegar a esos datos es el servicio en `127.0.0.1:8081`» |
-| ~91 | «No existe la base `muci` localmente» | Se elimina: ya no es relevante para este paquete. Lo que sí va es que **los tests no necesitan ninguna base ajena**, porque todo pasa por `Http::fake()` |
-| ~100–101 | El procedimiento de SSH + `MYSQL_PWD` para consultar `muci` | Se elimina. Quien necesite consultar la base va al repo del servicio |
-| ~109 | La referencia a `tests/Unit/TicketSales/BookingsOptionsParserTest.php` | Se elimina: ese archivo lo borró la Task 1 |
+| Sección | Qué hacer |
+|---|---|
+| `## Estado al 2026-08-14 — leer esto antes de tocar nada` | Reescribir: ya no hay migración a medias. El paquete consume el servicio y punto |
+| `## Las cuatro trampas de la base `muci`` | **Eliminar entera.** Ya lleva el aviso de que la Task 7 la borra. Esas trampas son responsabilidad del servicio y están documentadas en su repo; repetirlas acá invita a que alguien vuelva a consultar la base desde el CRM |
+| En `## Restricciones que no se negocian`, la viñeta «Solo lectura sobre `muci`» | Reemplazar por: «El CRM **no tiene** credencial de `muci`. La única forma de llegar a esos datos es el servicio en `127.0.0.1:8081`». Las dos viñetas nuevas —la de los `tipo` desconocidos y la de que ninguna falla toca el snapshot— **se quedan** |
+| En `## Entorno local`, «No existe la base `muci` localmente» y los fixtures de los 18 productos | Reemplazar por: los tests **no necesitan ninguna base ajena**, todo pasa por `Http::fake()` contra `tests/Fixtures/fooevents/respuesta-ejemplo.json` |
+| En `## Entorno local`, el procedimiento de SSH + `MYSQL_PWD` | Eliminar. Quien necesite consultar la base va al repo del servicio |
+| `## Prueba de aceptación` | Reemplazar: ya no la sostiene `BookingsOptionsParserTest` —la Task 1 borró ese archivo— sino el chequeo de números del `sync` contra producción, `11 funciones \| 26 entradas \| 0 avisos` |
 
-Y en el `README.md`, las filas de la tabla de unidades que describen
-`SpanishDateParser` y `BookingsOptionsParser` (líneas ~38 y ~40) y la mención a
-`wpzv_postmeta` (~29) — todo eso se reemplazó en el Step 1.
+En el `README.md` no queda nada por hacer: el Step 1 lo reemplazó entero.
 
 Run: `grep -n 'woocommerce\|WC_DB\|anthropic_readonly\|wpzv_\|BookingsOptionsParser\|SpanishDateParser' packages/CarlVallory/KrayinTicketSales/CLAUDE.md packages/CarlVallory/KrayinTicketSales/README.md`
 Expected: **sin resultados** al terminar el step.
