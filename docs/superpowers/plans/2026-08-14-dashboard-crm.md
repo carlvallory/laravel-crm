@@ -298,6 +298,95 @@ Se **borran**: `src/Support/BookingsOptionsParser.php`, `src/Support/SpanishDate
 
 ---
 
+## Desviaciones encontradas al ejecutar (Task 7, 2026-08-14)
+
+- **El punto de parada del Step 6 se superó con el número exacto:**
+  `11 funciones | 26 entradas | 0 avisos` para el 2026-08-07, idéntico a lo que
+  informó el servicio en su propia verificación final. **No hay bug de mapeo**, que
+  era el riesgo que este punto de parada existía para atrapar.
+- **El Step 5 no alcanzaba para instalar nada: el paquete no estaba requerido en
+  producción.** Es el hueco más grande de esta task. `composer update <paquete>`
+  sobre un paquete ausente del `require` no instala nada, y en el servidor **no
+  existe `packages/CarlVallory`**, así que el repositorio `path` del `composer.json`
+  no lo alcanza: los 9 hermanos `carlvallory/*` entran por entradas `vcs` a GitHub.
+  Hubo que agregar la entrada y requerirlo antes del `update`:
+
+  ```bash
+  composer config repositories.krayin-ticket-sales vcs https://github.com/carlvallory/krayin-ticket-sales
+  composer require --no-update carlvallory/krayin-ticket-sales:@dev
+  composer update carlvallory/krayin-ticket-sales
+  ```
+
+  El `require --no-update` es deliberado y no cosmético: `require` a secas resuelve
+  el árbol entero y en producción puede mover dependencias que nadie pidió. Así se
+  toca solo este paquete y lo suyo. El procedimiento corregido quedó en el README.
+- **`minimum-stability` es `stable` con `prefer-stable: true`, y aun así `@dev`
+  funciona:** la restricción `@dev` explícita del paquete alcanza, igual que en sus
+  hermanos. No hubo que aflojar la estabilidad global, que era el riesgo.
+- **La credencial de repos privados ya estaba en el servidor.** No hay `auth.json`
+  en `/var/www/crm`, pero `krayin-operations` es privado y está instalado: la
+  credencial es global del usuario que corre composer. Si alguna vez da 404 sobre un
+  repo `carlvallory/*`, es eso y no el paquete. Es el mismo hueco que el deploy del
+  servicio sí tuvo que tapar; acá ya estaba tapado.
+- **El hueco de `tinker` que mordió al servicio no aplica al CRM:** `laravel/tinker`
+  está en `require`, no en `require-dev`, así que sobrevive al `--no-dev` y el
+  Step 10 se puede verificar.
+- **El grep del Step 2 no puede dar vacío si las negaciones nombran lo prohibido.**
+  Daba cuatro hits, y los cuatro eran frases del tipo «ya no hay conexión
+  `woocommerce`». Se reformularon sin nombrar los tokens. Un chequeo que hay que
+  interpretar deja de ser chequeo — y el valor de este grep es que un agente futuro
+  lo pueda correr sin criterio propio.
+- **El README afirmaba «8 de 11» funciones sin ventas; son 5.** 11 programadas, 6
+  con venta, 26 entradas. Corregido junto con el resto del Step 1. Es un número que
+  el README venía arrastrando desde antes del servicio.
+- **La premisa del `fonts.googleapis.com` estaba mal planteada, en el plan y en el
+  handoff.** El `<link>` está en el HTML, así que **la fuente la baja el navegador
+  de quien mira el tablero, no el servidor**. La salida HTTPS del servidor no es la
+  dependencia. Se verificó de todos modos —HTTP 200 en 73 ms desde el servidor, y
+  devuelve el `@font-face` de Poppins— pero lo que decide es el Step 8.
+- **El Step 7 no discrimina la zona horaria a la hora en que se corrió.** A las
+  16:00 de Asunción / 19:00 UTC los dos calendarios dan `2026-08-14`, así que el
+  `sync` sin `--fecha` habría acertado igual leyendo UTC. La prueba real solo separa
+  entre las 21:00 locales y la medianoche UTC. El código está testeado; en
+  producción queda sin ejercitar hasta esa ventana.
+- **Los Steps 4 a 10 necesitan `sudo`, que el acceso de agente no tiene.**
+  `anthropic_readonly` no puede escalar ni leer el `.env` del CRM. Los ejecutó
+  Carlos, con los comandos dictados; la verificación del agente fue por SSH de solo
+  lectura sobre `vendor/`, `composer.json`, `composer.lock` y los logs. Contrastar
+  el `reference` del lock contra el commit pusheado (`e7bcb5d`) es lo que prueba que
+  se instaló el código correcto, y **no** el `mtime` de `vendor/`, que confunde: el
+  campo `time` del lock es la fecha del *commit*, no de la instalación.
+- **El cron del CRM estaba vivo antes de esta task, y hay cómo verlo sin base de
+  datos:** el log tira un error de Sendgrid preexistente cada 5 minutos exactos.
+  No es nuestro, y sirve de prueba de que `schedule:run` corre. De paso: el log
+  escribe en `America/Asuncion`, no en UTC.
+- **Con `0 avisos` el `sync` no deja rastro en el log**, que es lo correcto —los
+  avisos se loguean como `warning`— pero significa que el log no sirve para
+  confirmar que el sync corrió. Para eso está el `synced_at` del Step 10.
+- **Quedan dos `.bak` en `/var/www/crm`** (`composer.json.bak`, `composer.lock.bak`),
+  hechos a propósito antes de tocar composer. Borrarlos cuando el tablero lleve unos
+  días estable.
+
+- **El Step 8 pasó:** Carlos abrió `https://crm.muci.org/admin/ticket-sales` con
+  sesión de admin y ve las funciones del día, todo bien. Con eso se cierra el ojo
+  humano que la Task 6 había dejado a propósito para acá, y queda confirmada de la
+  única forma que vale —desde un navegador— la cadena de Poppins.
+
+**Pendiente al cierre de esta sesión, dos cosas:**
+
+1. **El Step 9** (bajar `php8.4-fpm` para probar que una falla del servicio no vacía
+   el snapshot) quedó **agendado para fuera de horario** por decisión de Carlos. Es
+   la única verificación real de la promesa central del §4.2; hasta que corra, esa
+   promesa está cubierta por los tests con `Http::fake()` pero no contra el servicio
+   real.
+2. **El Step 10** (esperar una corrida automática y mirar el `synced_at`) no se
+   confirmó explícitamente. Lo que sí está verificado es que el comando figura en
+   `schedule:list` como `*/5 * * * *` y que `schedule:run` corre de verdad —el error
+   de Sendgrid cada 5 minutos exactos lo prueba—, así que falta solo mirar el
+   `synced_at`.
+
+---
+
 ### Task 1: Retirar el acceso directo a `muci`
 
 El paquete deja de tener la credencial y deja de tener los parsers, que ahora viven en el servicio. Es una task de borrado: la única forma de verificar que no rompió nada es que lo que queda siga verde.
@@ -2529,7 +2618,7 @@ La primera vez que el CRM y el servicio se hablan de verdad. Todo lo anterior co
 - Modify: `packages/CarlVallory/KrayinTicketSales/CLAUDE.md`
 - Modify (en el servidor, no versionado): `.env` del CRM
 
-- [ ] **Step 1: Actualizar el README del paquete**
+- [x] **Step 1: Actualizar el README del paquete**
 
 Reemplazar el contenido de `packages/CarlVallory/KrayinTicketSales/README.md` por:
 
@@ -2617,7 +2706,7 @@ Los tests no corren en el servidor: el CRM se instala con `--no-dev` y ahí no h
 Pest. La verificación en producción es el chequeo de números del `sync`.
 ````
 
-- [ ] **Step 2: Actualizar el `CLAUDE.md` del paquete**
+- [x] **Step 2: Actualizar el `CLAUDE.md` del paquete**
 
 El `CLAUDE.md` sigue describiendo un paquete que lee `muci` directo. Estas son
 las secciones concretas a corregir (referenciadas por título, no por línea):
@@ -2640,7 +2729,7 @@ Expected: **sin resultados** al terminar el step.
 > login **se quedan**: son el museo, no la base. El `grep` de arriba no las
 > toca a propósito.
 
-- [ ] **Step 3: Commit y publicar el paquete**
+- [x] **Step 3: Commit y publicar el paquete**
 
 ```bash
 git add packages/CarlVallory/KrayinTicketSales/README.md \
@@ -2654,7 +2743,7 @@ Y en el repo propio del paquete, empujar a `carlvallory/krayin-ticket-sales`.
 > operation`), empujar por HTTPS con el token de `gh` y dejar el credential helper
 > **local al repo**, sin tocar la config global. Ya pasó al publicar el servicio.
 
-- [ ] **Step 4: Configurar el `.env` de producción**
+- [x] **Step 4: Configurar el `.env` de producción**
 
 En el servidor, en `/var/www/crm/.env`:
 
@@ -2675,7 +2764,7 @@ sudo grep FOOEVENTS_TOKEN /var/www/servicio-fooevents/.env
 > de al lado no lo pueda leer. Copiar el valor con `sudo`, y no dejarlo en el
 > historial de shell.
 
-- [ ] **Step 5: Desplegar**
+- [x] **Step 5: Desplegar**
 
 ```bash
 cd /var/www/crm
@@ -2686,7 +2775,7 @@ cd /var/www/crm
 
 Expected: la migración informa `Ran` para `create_muci_ticket_sales_tables`.
 
-- [ ] **Step 6: PUNTO DE PARADA — verificar los números contra el servicio**
+- [x] **Step 6: PUNTO DE PARADA — verificar los números contra el servicio**
 
 ```bash
 /usr/bin/php8.2 artisan ticket-sales:sync --fecha=2026-08-07
@@ -2712,7 +2801,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 > clase de falla silenciosa que este proyecto ya se comió una vez. No seguir con
 > los steps de abajo hasta resolverlo.
 
-- [ ] **Step 7: Verificar el día de hoy y el scheduler**
+- [x] **Step 7: Verificar el día de hoy y el scheduler**
 
 ```bash
 /usr/bin/php8.2 artisan ticket-sales:sync
@@ -2722,7 +2811,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 Expected: el sync sin `--fecha` usa el día de Asunción y no el UTC (comparar con
 `TZ=America/Asuncion date +%F`); `schedule:list` muestra `*/5 * * * *`.
 
-- [ ] **Step 8: Verificar el tablero en el navegador**
+- [x] **Step 8: Verificar el tablero en el navegador**
 
 Abrir `https://crm.muci.org/admin/ticket-sales` con una cuenta `@muci.org`.
 
@@ -2768,7 +2857,7 @@ Esperar 5 minutos y verificar que el scheduler corrió solo:
 Expected: un `synced_at` de hace menos de 5 minutos, sin que nadie haya corrido
 el comando a mano.
 
-- [ ] **Step 11: Anotar las desviaciones y cerrar**
+- [x] **Step 11: Anotar las desviaciones y cerrar**
 
 Agregar a este archivo una sección `## Desviaciones encontradas al ejecutar
 (Task 7, fecha)` con lo que el plan decía y lo que la realidad resultó ser.
