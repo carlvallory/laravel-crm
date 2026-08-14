@@ -231,6 +231,73 @@ Se **borran**: `src/Support/BookingsOptionsParser.php`, `src/Support/SpanishDate
 
 ---
 
+## Desviaciones encontradas al ejecutar (Task 6, 2026-08-14)
+
+- **El punto de parada no se activó:** la base `krayin` local tiene el usuario id 1
+  (`Vallory <carlos@muci.org>`), así que `getDefaultAdmin()` devuelve admin y
+  ninguno de los tests salió `skipped`.
+- **El plan dice 12 tests del tablero pero su propio código trae 11.** Error de
+  conteo, no un test faltante. Con los tres agregados abajo, el archivo cierra en
+  **14**.
+- **Tres mutaciones sobrevivieron. Las tres eran tests que pasaban por
+  casualidad:**
+  1. **El filtro del controlador no estaba fijado por nada.** La Mutación 1
+     (`where('fecha', $hoy)` -> `where('fecha', $fechaDelSync)`) sobrevive en su
+     versión fiel, porque lo que salva al `estado 3` es **solo la rama `OTRO_DIA`
+     de la vista**: aunque el controlador cargue las funciones de ayer, la vista no
+     dibuja la tabla. El plan lista M1 y M3 como **dos** guardas y esperaba que
+     cada una muriera por su cuenta; solo una estaba cubierta, y el día que alguien
+     reordene la vista las filas del otro día salen. Ojo: la mutación **tal como el
+     plan la escribe** muere, pero por otra razón — `$fechaDelSync` todavía no está
+     en scope en ese punto, así que el filtro queda en `null`. Hay que mover el
+     cálculo arriba para mutar de verdad.
+     **Arreglado** con `expect($respuesta->viewData('funciones'))->toHaveCount(0)`
+     en el test del `estado 3`: fija que las filas del otro día **no llegan** a la
+     vista, independiente de lo que la vista haga con ellas.
+  2. **El test de orden pasaba por el nombre, no por la hora.** Sacar el
+     `orderByRaw('hora IS NULL, hora')` dejaba el test verde porque los shows del
+     plan se llamaban «Mañana» y «Tarde», y su orden **alfabético** coincide con el
+     de las horas — el `orderBy('show_nombre')` que queda daba el mismo resultado.
+     **Arreglado** invirtiendo los nombres («Zeta» a las 08:30, «Alfa» a las
+     19:00) y **agregando dos tests**, uno por cada parte restante del criterio: el
+     desempate por nombre a igual hora, y que las funciones **sin hora van al
+     final** (sin el `hora IS NULL`, MySQL pone los NULL primero y una función sin
+     horario encabezaría el tablero). Ahora mueren las tres variantes por separado.
+  3. **`assertSee('—')` pasaba siempre.** La Mutación 7 (`?? 0` en vez de la raya)
+     sobrevivía porque la raya larga **también está en el párrafo del pie** de la
+     vista. Es exactamente la trampa que el plan ya había previsto para
+     `muci-banda` —y por la que inventó el `data-viejo`—, sin aplicarla acá.
+     **Arreglado** con la misma solución: la celda vacía ahora es
+     `<span data-cupos-vacio="1">—</span>` y el test assertea el atributo. Y se
+     **agregó** el test complementario: **cupos en 0 se ve como 0, no como raya**,
+     que es la distinción del §11 (0 es venta online cerrada, `null` es función no
+     programada) y que ninguna versión anterior fijaba.
+- **La Mutación 9 (borrar el singleton de `BusinessDay`) sobrevivió, como el plan
+  anticipó.** No se persigue. Cierra el pendiente anotado en la Task 1: el binding
+  no lo cubre ningún test y no hace falta que lo cubra — Laravel resuelve la clase
+  igual con su default `America/Asuncion`; el singleton solo existe para que la
+  zona salga de la config.
+- **El Step 7 (verificación en el navegador) quedó a medias, y a propósito:** se
+  verificó todo el **marcado** desde el harness —entrada en `menu.admin` y en
+  `acl`, el `<link>` de Poppins, las cinco tintas de la paleta en el HTML, el
+  `meta refresh` de 300s, la nota de reagendadas— y que
+  `fonts.googleapis.com` responde 200 desde la máquina de desarrollo. Lo que
+  **no** se hizo es mirarlo en pantalla: eso pide un navegador con sesión de admin
+  y ojo humano. **Queda para la Task 7.**
+- **Dos cosas para mirar en el deploy, ninguna es un bug de esta task:**
+  1. **Poppins viene de Google Fonts, o sea de la red.** Si el servidor no tiene
+     salida HTTPS, la fuente cae en silencio al `sans-serif` del sistema y el
+     tablero se ve en Inter sin que nada avise. Verificar el 200 desde el servidor
+     en la Task 7; si no lo hay, la fuente hay que servirla local.
+  2. **`core()->formatBasePrice(70000)` devuelve `"PYG 70,000"`, no `"₲ 70.000"`.**
+     Es la configuración de moneda base de Krayin, no de este paquete, y no se
+     tocó. Si Carlos la quiere en guaraníes con el símbolo, es su propia tarea.
+- **El total del paquete cierra en 66 tests, no 62:** 6 de `BusinessDay`, 12 de
+  `EstadoDelTablero`, 16 del cliente, 6 del snapshot, 12 del comando y 14 del
+  tablero. Sin fallas y **sin un solo skip**. La suite entera del CRM: 118.
+
+---
+
 ### Task 1: Retirar el acceso directo a `muci`
 
 El paquete deja de tener la credencial y deja de tener los parsers, que ahora viven en el servicio. Es una task de borrado: la única forma de verificar que no rompió nada es que lo que queda siga verde.
