@@ -213,6 +213,49 @@ Laravel.
     pares de más para `lineasDe()`, y `armar()` prorratea solo sobre los pares de
     tickets completados. Es una consulta más ancha, no un resultado distinto.
 
+## Desviaciones encontradas al ejecutar (Task 7, 2026-08-14) — PLAN COMPLETO
+
+**Verificación final, contra producción:** `11 funciones | 26 entradas | 0 avisos`
+para el 2026-08-07. Los tres modos de falla que ese número descarta: 7 funciones
+sería el parser ignorando la forma B, 6 sería la programación sin cruzarse, y las
+5 funciones sin ventas aparecen en cero como corresponde.
+
+**El punto de parada pasó:** `LISTEN 127.0.0.1:8081` (no `0.0.0.0`), y desde fuera
+de la máquina el puerto no conecta — `curl` sale por timeout y el TCP directo
+falla. Adentro: 401 sin token y 404 en `/api/v1/funciones`, que confirma el
+`apiPrefix: ''`.
+
+**Faltaba `deploy/php-fpm-pool.conf`.** El plan lo listaba en *Files* pero ningún
+Step lo escribía ni lo instalaba, y el vhost apunta a un socket de pool dedicado
+que no existía: en el servidor solo estaba `www.conf`. Sin ese archivo el
+despliegue da 502.
+
+**El pool corre como usuario propio `fooevents`, no `www-data`** (decisión de
+Carlos). Es lo que hace que la decisión de auth se sostenga: con `www-data`, el
+WordPress de 84 plugins podría leer el `.env` y quedarse con el token, o sea
+justo la amenaza por la que se eligió token. Verificado en producción: el `.env`
+quedó en `640 fooevents:fooevents` y `anthropic_readonly` no lo puede leer.
+
+**Clonar el repo necesitaba credenciales en el servidor,** que el plan no
+menciona. El repo se publicó en `carlvallory/servicio-fooevents` **privado** —lleva
+el prefijo `wpzv_` y el nombre de la base cableados, y los fixtures son un volcado
+real— y se documentó el procedimiento de deploy key de solo lectura.
+
+**El README afirmaba algo imposible, corregido.** Decía que en el servidor los 4
+tests skipped debían pasar; con `composer install --no-dev` no hay Pest ni PHPUnit
+y `vendor/bin/pest` no existe allá. La verificación equivalente es el chequeo de
+números por el endpoint, o `artisan tinker`, que sí está en producción porque
+`laravel/tinker` va en `require` y no en `require-dev`.
+
+**Trampa de entorno local, no del plan:** el agente SSH de la máquina de desarrollo
+rechaza la firma (`agent refused operation`) aunque la clave esté registrada en
+GitHub y cargada. Se empujó por HTTPS con el token de `gh`, dejando el credential
+helper **local al repo** para no tocar la config global.
+
+**Detalle menor sin consecuencia:** `bootstrap/cache/config.php` quedó `root:root`
+porque el `config:cache` se corrió con sudo. Se lee igual y `fooevents` puede
+borrarlo porque el directorio es suyo.
+
 ## Estructura de archivos
 
 | Archivo | Responsabilidad |
