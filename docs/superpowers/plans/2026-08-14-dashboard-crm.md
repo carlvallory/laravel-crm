@@ -91,6 +91,38 @@ Se **borran**: `src/Support/BookingsOptionsParser.php`, `src/Support/SpanishDate
 
 ---
 
+## Desviaciones encontradas al ejecutar (Task 2, 2026-08-14)
+
+- **La Mutación 8 sobrevivió, y encontró un test que pasaba por casualidad.** El
+  plan dice que cambiar el guard `! $respuesta->successful()` por
+  `status() !== 404` debe matar `500 se reintenta igual que el 503`. No lo mata:
+  mata `503 se reintenta una vez y después se rinde`. La razón es que con el guard
+  mutado el 500 no se clasifica —cae hasta `validar()`, que se ahoga con el cuerpo
+  del error y lanza `respuestaInvalida`—, **y `respuestaInvalida` también es un
+  `ErrorDelServicio`**, así que el `toThrow(ErrorDelServicio::class)` del test del
+  500 seguía verde. El del 503 murió solo porque además asserta `nivel()`.
+  Importa: el nivel es el del log y el plan lo declara no cosmético. Un 500 que se
+  loguea `error` en vez de `warning` es justo el ruido que la decisión de niveles
+  quiso evitar, y el mensaje "falta la clave `fecha`" manda a buscar un bug de
+  contrato cuando lo que pasa es que el servicio está caído.
+  **Test reforzado** (no lo pedía el plan): el del 500 ahora fija la
+  clasificación, no solo que algo lanzó — `nivel()` en `'warning'` y el mensaje
+  conteniendo `'500'`. Con eso, la Mutación 8 mata **dos** tests.
+  Moraleja para las tasks 4 a 6: **`toThrow(ClaseDeExcepción::class)` a secas no
+  vale cuando la clase tiene varias fábricas.** Hay que assertar cuál.
+- **Las otras siete mutaciones murieron**, cada una incluyendo el test que el plan
+  predecía. Tres mataron más de uno: la de `$intentos >= 1` mata cuatro y la de
+  `$intentos >= 3` mata tres, porque el conteo de requests lo assertan varios.
+- **Los 16 tests del Step 6 fallan por el motivo que el plan dice** (`Target class
+  [...FooEventsServiceClient] does not exist`), pero el error sale de la línea 17
+  del test —el `app(...)` del `beforeEach`—, no de la llamada a `funcionesDe()`.
+  No cambia nada; conviene saberlo para no perseguir el `beforeEach`.
+- **El fixture del servicio coincide con lo que los tests esperan** (producto
+  192637, 2 entradas, 70000 bruto). Al 2026-08-14 los dos repos están en sincronía
+  y la copia a mano del Step 1 no hizo falta ajustarla.
+
+---
+
 ### Task 1: Retirar el acceso directo a `muci`
 
 El paquete deja de tener la credencial y deja de tener los parsers, que ahora viven en el servicio. Es una task de borrado: la única forma de verificar que no rompió nada es que lo que queda siga verde.

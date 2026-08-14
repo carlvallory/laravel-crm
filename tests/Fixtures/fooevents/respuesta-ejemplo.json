@@ -1,0 +1,18 @@
+{
+  "fecha": "2026-08-07",
+  "generado_en": "2026-08-07T17:30:00-03:00",
+  "avisos": [],
+  "funciones": [
+    {
+      "producto_id": 192637,
+      "show": "Entrada Bioestanque",
+      "slot": "BioEstanque (16:00) (17:00)",
+      "hora": "17:00",
+      "entradas_vendidas": 2,
+      "entradas_reagendadas": 0,
+      "cupos_habilitados": 18,
+      "recaudacion_neta": 63636,
+      "recaudacion_bruta": 70000
+    }
+  ]
+}
