@@ -1364,6 +1364,58 @@ git commit -m "feat: repositorio de lectura de la base muci"
 - Consumes: `FooEventsRepository` (Task 5), `FuncionesDelDia::armar()` (Task 4), `BookingsOptionsParser::parse()` (Task 2)
 - Produces: `tests/Fixtures/respuesta-ejemplo.json`, que el CRM copia como fixture de `Http::fake()`
 
+> **Dos decisiones que Carlos cerró el 2026-08-14, antes de ejecutar esta task.**
+> Están en el §3.2 y el §4.1 del diseño; acá va qué cambia en el código.
+>
+> **1. `json_ilegible` se decide por `json_decode`, no por contar funciones.** Ya
+> está aplicado en el Step 3 de abajo. Un JSON válido que no da ninguna función se
+> saltea **en silencio**, igual que la meta vacía. El motivo: contar funciones
+> confunde "no pude leer" con "leí bien y no hay fechas", así que diagnosticaba
+> mal, y un producto cuya única fecha es ilegible emitía `fecha_no_parseable` **y**
+> `json_ilegible` por lo mismo. Verificado con los tres casos antes de decidir.
+>
+> Hace falta un test de esto, que el Step 1 no traía:
+>
+> ```php
+> test('un JSON válido sin ninguna función se saltea sin avisar', function () {
+>     $this->mock(\App\Repositories\FooEventsRepository::class, function ($m) {
+>         $m->shouldReceive('productosConBookings')->andReturn([
+>             ['producto_id' => 3, 'show' => 'Sin fechas', 'bookings_json' => json_encode([
+>                 'k' => ['label' => 'A', 'formatted_time' => '(10:00)', 'add_date' => []],
+>             ])],
+>         ]);
+>         $m->shouldReceive('ticketsDeLaFecha')->andReturn([]);
+>         $m->shouldReceive('lineasDe')->andReturn([]);
+>     });
+>
+>     pedir()->assertOk()->assertJsonPath('avisos', [])->assertJsonPath('funciones', []);
+> });
+> ```
+>
+> **2. Entra un quinto código, `linea_faltante`.** Un par con entradas y sin línea
+> de plata da recaudación cero **con aviso**, en vez de cero callado.
+>
+> **Ojo: esto se implementa en `FuncionesDelDia::armar()`, que es código de la
+> Task 4 y ya está commiteado** (`49ecdaa`). Sale del alcance nominal de esta task.
+> El cambio es reemplazar el `?? ['neto' => 0, 'bruto' => 0]` por:
+>
+> ```php
+> $linea = $lineas[$par] ?? null;
+>
+> if ($linea === null) {
+>     $avisos[] = [
+>         'tipo'    => 'linea_faltante',
+>         'detalle' => "Par {$par}: tiene entradas pero no tiene línea de plata. "
+>             . 'Recaudación en cero para ese par.',
+>     ];
+>
+>     $linea = ['neto' => 0, 'bruto' => 0];
+> }
+> ```
+>
+> Con su test en `tests/Unit/FuncionesDelDiaTest.php`, que además cubre el agujero
+> que hoy tiene esa clase: ningún test pasa un par con entradas y sin línea.
+
 - [ ] **Step 1: Escribir los tests que fallan**
 
 Agregar a `tests/Feature/FuncionesEndpointTest.php`:
@@ -1570,6 +1622,19 @@ private function programacion(FooEventsRepository $repo, BookingsOptionsParser $
             continue;
         }
 
+        // `json_ilegible` se decide por si el JSON parsea, NO por contar
+        // funciones. Contarlas confunde "no pude leer" con "leí bien y no hay
+        // fechas cargadas": diagnostica mal, y un producto cuya única fecha es
+        // ilegible emitiría dos avisos por lo mismo.
+        if (! is_array(json_decode($json, true))) {
+            $avisos[] = [
+                'tipo'    => 'json_ilegible',
+                'detalle' => "Producto {$producto['producto_id']}: no se pudo leer la meta de bookings.",
+            ];
+
+            continue;
+        }
+
         $leido     = $parser->parseConAvisos($json);
         $funciones = $leido['funciones'];
 
@@ -1578,15 +1643,6 @@ private function programacion(FooEventsRepository $repo, BookingsOptionsParser $
                 'tipo'    => 'fecha_no_parseable',
                 'detalle' => "Producto {$producto['producto_id']}: fecha \"{$cruda}\" ilegible, se descartó.",
             ];
-        }
-
-        if ($funciones === []) {
-            $avisos[] = [
-                'tipo'    => 'json_ilegible',
-                'detalle' => "Producto {$producto['producto_id']}: no se pudo leer la meta de bookings.",
-            ];
-
-            continue;
         }
 
         foreach ($funciones as $f) {

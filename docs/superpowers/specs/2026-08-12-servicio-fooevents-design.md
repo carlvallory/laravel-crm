@@ -113,8 +113,18 @@ Las funciones vienen ordenadas por `hora` y, a igual hora, por `show`. El orden
 es parte del contrato: así el CRM no tiene que reordenar ni inventar criterio.
 
 Cada elemento de `avisos` tiene la forma `{"tipo": "...", "detalle": "..."}`,
-donde `tipo` es un código estable (`json_ilegible`, `fecha_no_parseable`,
-`estado_desconocido`, `prorrateo_ambiguo`) y `detalle` el texto para el log.
+donde `tipo` es un código estable y `detalle` el texto para el log. Los códigos
+son cinco: `json_ilegible`, `fecha_no_parseable`, `estado_desconocido`,
+`prorrateo_ambiguo` y `linea_faltante`.
+
+`linea_faltante` se agregó el 2026-08-14, al ejecutar la Task 5. Cubre un par
+pedido+producto que tiene entradas pero **no** tiene línea de plata: antes eso
+daba recaudación cero sin decir nada, y un total corto sin explicación es peor que
+un aviso. Hoy es inalcanzable —los 5516 pares tienen línea— pero es la misma
+categoría de riesgo futuro que `prorrateo_ambiguo`.
+
+**El CRM no debe fallar ante un `tipo` que no conozca.** Agregar códigos es
+aditivo y va a volver a pasar; el consumidor los loguea y sigue.
 
 ### 3.3 Prorrateo de la recaudación
 
@@ -199,6 +209,8 @@ Un producto ilegible no puede tumbar el día entero.
 | Base `muci` inalcanzable | `503`. No devuelve datos parciales ni cachea |
 | JSON de un producto ilegible | Se saltea ese producto, aviso con el `product_id`, el resto sigue |
 | Meta de bookings vacía, `null` o `[]` | **Normal, sin aviso.** Son 2 de los 18 productos y siempre fueron así |
+| JSON válido que no da ninguna función | **Normal, sin aviso.** Se saltea el producto y nada más. Decidido el 2026-08-14: `json_ilegible` se resuelve por si el JSON **parsea**, no por contar funciones. Contarlas confunde "no pude leer" con "leí bien y está vacío", diagnostica mal y en un caso emite dos avisos por lo mismo |
+| Par pedido+producto con entradas y sin línea de plata | Recaudación en cero para ese par y aviso `linea_faltante`. El resto del día sigue |
 | Fecha en español no parseable | Se descarta esa fecha, el resto del slot se conserva, aviso |
 | Estado de pedido desconocido | No se cuenta, aviso con el estado |
 | Prorrateo ambiguo (par multifunción con precios distintos) | Reparte con el promedio y avisa. A nivel producto y a nivel día el número sigue siendo exacto |
