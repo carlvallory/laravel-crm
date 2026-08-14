@@ -60,6 +60,37 @@ Se **borran**: `src/Support/BookingsOptionsParser.php`, `src/Support/SpanishDate
 
 ---
 
+## Desviaciones encontradas al ejecutar (Task 1, 2026-08-14)
+
+- **El `git add` del Step 10 no puede ser uno solo: son dos repos.**
+  `/packages/CarlVallory` está gitignoreado en el CRM (`.gitignore:39`), así que
+  `git add packages/CarlVallory/...` desde la raíz del CRM no registra nada. Lo
+  del paquete (`src/`, `composer.json`, `CLAUDE.md`, `README.md`) se commitea en
+  el repo propio del paquete; lo de `tests/`, `.env.example` y `docs/` en el del
+  CRM. **Aplica al Step de commit de las siete tasks**, no solo a esta.
+- **El bloque del `.env` traía cuatro líneas de comentario además de las seis
+  variables.** El Step 5 manda borrar solo las seis; borrar solo eso deja un
+  comentario huérfano que describe la conexión a `muci` —justo la referencia que
+  la constraint prohíbe—. Se borran las líneas 24–34 completas en ambos archivos.
+  Ojo: el comentario **no es el mismo texto** en `.env` y en `.env.example`, pero
+  cae en las mismas líneas.
+- **La Mutación 3 sobrevivió, como el plan anticipó.** Borrar el
+  `singleton(BusinessDay::class, ...)` deja la suite en verde porque los 6 tests
+  hacen `new BusinessDay()` directo. No se escribe test acá: lo cubre la Task 6,
+  que resuelve por el contenedor. Queda anotado para que no se lea como agujero
+  nuevo.
+- **Los residuos de `anthropic_readonly` y `wpzv_` en `CLAUDE.md` y `README.md`
+  del paquete sobreviven a esta task por diseño.** Los borra la Task 7 (Steps 1 y
+  2). La constraint "ni una referencia" se cumple en el código desde acá y en la
+  documentación desde la Task 7.
+- **El Step 8 no tiene con qué comparar si no se corrió antes.** Pide "sin fallas
+  nuevas respecto de antes de esta task" pero ningún step anterior guarda ese
+  número. Quedó en **58 passed, 0 failed, 0 skipped**, que hace la comparación
+  innecesaria; si alguna vez diera rojo, hay que sacar el baseline con `git
+  stash`.
+
+---
+
 ### Task 1: Retirar el acceso directo a `muci`
 
 El paquete deja de tener la credencial y deja de tener los parsers, que ahora viven en el servicio. Es una task de borrado: la única forma de verificar que no rompió nada es que lo que queda siga verde.
