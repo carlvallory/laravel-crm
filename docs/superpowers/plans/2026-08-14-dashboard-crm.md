@@ -123,6 +123,47 @@ Se **borran**: `src/Support/BookingsOptionsParser.php`, `src/Support/SpanishDate
 
 ---
 
+## Desviaciones encontradas al ejecutar (Task 3, 2026-08-14)
+
+- **El `migrate:fresh` del Step 7 no se usó: borra la base de desarrollo entera.**
+  Las mutaciones 1 y 3 son sobre el esquema y necesitan recrearlo, pero
+  `migrate:fresh` tira **todas** las tablas de `krayin` (usuarios, leads, todo) y
+  re-corre todas las migraciones. `php artisan migrate:rollback --step=1 &&
+  php artisan migrate` da el mismo esquema mutado tocando **solo estas dos
+  tablas**. Usar eso, acá y en cualquier task que mute una migración.
+- **La Mutación 4 sobrevivió, y encontró otro test que pasaba por casualidad.** El
+  plan dice que quitar `'recaudacion_neta' => 'integer'` de `$casts` muere porque
+  "el `toBe(63636)` es estricto y una cadena no pasa". No muere: **PDO ya devuelve
+  entero nativo para una columna INT, con cast o sin él.** Medido con la sonda:
+  leído de MySQL da `int` en los dos casos; el cast solo se nota cuando el valor
+  llega **como cadena desde PHP** (`int` con cast, `string` sin él). El test del
+  plan persiste y vuelve a leer, así que hace coincidir "el modelo garantiza
+  entero" con "el driver casualmente devuelve entero" — el proxy más simple.
+  **Test agregado** (no lo pedía el plan): `los montos y los conteos son enteros
+  porque el modelo lo garantiza, no porque el driver los devuelva así`, que
+  construye el modelo con todos los numéricos como cadena y **sin ida a la base**.
+  Mata la Mutación 4 y también la de cualquier otro cast entero que falte.
+  Importa por la decisión 3 del plan (recaudación entera) y porque la Task 6 suma
+  estas columnas: una cadena colándose ahí es la clase de bug que no falla, calla.
+- **Por eso la Task 3 cierra con 6 tests, no 5,** y el total del plan pasa de 62 a
+  **63**.
+- **La Mutación 5 deja el esquema a medias, y hay que repararlo a mano.** Es lo que
+  demuestra, pero conviene saberlo: el `down()` mutilado borra solo `snapshot`, el
+  rollback igual borra la fila de `migrations`, y el `migrate` siguiente muere con
+  `1050 Table 'muci_ticket_sales_sync' already exists`. Queda `sync` huérfana y la
+  migración sin registrar. Se repara con `Schema::dropIfExists('muci_ticket_sales_sync')`
+  y `php artisan migrate`. Verificar que la tabla está vacía antes de borrarla.
+- **La Mutación 2 mata tres tests, no uno.** Sin el cast `array`, `avisos` sale como
+  cadena JSON y se caen también `la cabecera admite avisos vacíos` y `no puede
+  haber dos cabeceras para la misma fecha`.
+- **Los tests corren contra la base `krayin` de desarrollo, no sobre sqlite.** El
+  `phpunit.xml` del CRM no fija `DB_CONNECTION`, así que usa el `.env`; por eso el
+  Step 5 tiene que correr `php artisan migrate` antes de los tests, y por eso los
+  tests usan `DatabaseTransactions`. No confundir con el servicio, que sí corre
+  sobre sqlite `:memory:`.
+
+---
+
 ### Task 1: Retirar el acceso directo a `muci`
 
 El paquete deja de tener la credencial y deja de tener los parsers, que ahora viven en el servicio. Es una task de borrado: la única forma de verificar que no rompió nada es que lo que queda siga verde.
