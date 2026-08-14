@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **PHP 8.4 explícito.** En el servidor, todo `composer`/`artisan` se corre con `/usr/bin/php8.4`. El `php` del CLI es un 8.5 incompleto sin `pdo_mysql`.
+- **PHP 8.4 explícito.** En el servidor, todo `composer`/`artisan` se corre con `/usr/bin/php8.4`. **No** porque el `php` del CLI le falte algo —es un 8.5.8 y sí tiene `pdo_mysql`, la nota vieja que decía lo contrario era falsa— sino porque el pool que sirve la app es 8.4: resolver o compilar con 8.5 metería paquetes que el 8.4 no carga.
 - **La base `muci` es de solo lectura.** Usuario `anthropic_readonly`, grant `SELECT` puro. Ningún `Model::save()`, ninguna migración sobre esa conexión.
 - **`CURDATE()` y `NOW()` están prohibidos** en toda consulta. La fecha siempre entra como parámetro.
 - **Prefijo de tablas `wpzv_`.** HPOS activo: los pedidos están en `wpzv_wc_orders`, no en `wpzv_posts`.
@@ -29,7 +29,7 @@ Anotadas acá para que las tareas 2 a 7 no repitan el tropiezo:
 
 - **Laravel 12, no 11.** `create-project` sin versión trae **Laravel 13, que exige PHP ^8.3** y no arrancaría en el php-fpm 8.2 que producción tenía entonces. Se pide `laravel/laravel:^12.0`.
 - **En local se usa `php` (8.3), no `/usr/bin/php8.4`,** que no existe en la máquina de desarrollo. El `/usr/bin/php8.4` de los comandos de abajo aplica **solo en el servidor**.
-- **`composer config platform.php 8.2.99`.** Sin eso el lock resuelve paquetes que en prod no cargan; ya atajó a `laravel/pint` v1.30.5. **Superado:** el pin está en `8.4.99` desde el 2026-08-13, ver la sección de abajo.
+- **`composer config platform.php 8.2.99`.** Sin eso el lock resuelve paquetes que en prod no cargan; ya atajó a `laravel/pint` v1.30.5. **Superado:** el pin está en `8.4.21` desde el 2026-08-14, ver la sección de abajo.
 - **`install:api` arrastra Sanctum,** que el spec descartó. Hay que quitar el paquete, `config/sanctum.php` y la migración de `personal_access_tokens`.
 - **Pest 3 se instala a mano:** `php artisan pest:install` no existe; hay que crear `tests/Pest.php`.
 
@@ -64,9 +64,9 @@ Estado real del parque al 2026-08-13:
 
 | Dónde | Versión | Nota |
 |---|---|---|
-| WordPress/WooCommerce (prod) | **8.4** | Ya está ahí. Implica que `php8.4-fpm` ya existe en esa máquina. |
+| WordPress/WooCommerce (prod) | **8.4** | **Verificado el 2026-08-14:** `/run/php/php8.4-fpm.sock` existe en el servidor, junto con los de 8.1 y 8.2. |
 | CRM Krayin (prod) | 8.2 | Carlos lo quiere subir a 8.4; todavía no pasó. |
-| CLI del servidor | 8.5 | **Incompleto, sin `pdo_mysql`.** Nunca usar `php` a secas allá. |
+| CLI del servidor | **8.5.8**, y **sí tiene `pdo_mysql`** | Igual se usa `/usr/bin/php8.4` (allá es 8.4.21): el pool que sirve la app es 8.4 |
 | Máquina de desarrollo | 8.3 (`php`) y **8.4 con paridad completa** | Desarrollar con `/usr/bin/php8.4`. |
 
 **El servicio no depende del upgrade de Krayin.** Tiene vhost y pool propios, así
@@ -84,7 +84,7 @@ instaló el espejo exacto de los `php8.3-*`:
                      php8.4-mysql php8.4-soap php8.4-sqlite3 php8.4-xml php8.4-zip
 
 Hoy la paridad de extensiones entre 8.3 y 8.4 es total, en los dos sentidos.
-`config.platform.php` quedó en **`8.4.99`** y `require.php` en **`^8.4`**.
+`require.php` quedó en **`^8.4`** y `config.platform.php` en **`8.4.21`**, que es el patch real del `php8.4` del servidor. Se puso 8.4.99 primero y se corrigió el 2026-08-14 al verificarlo por SSH: pasarse por arriba deja que el lock tome un paquete que exija un patch inexistente allá.
 
 **Desarrollar con `/usr/bin/php8.4`, no con `php`.** El `php` de la máquina de
 desarrollo sigue siendo 8.3, así que dev y prod solo coinciden si se invoca el
@@ -135,6 +135,57 @@ su propia tarea.
 - **`$entradas === []` es redundante** y se dejó igual. `array_sum([])` es `0`,
   así que `$totalEntradas <= 0` ya cubre el arreglo vacío; quitarla no rompe
   ningún test. Queda porque documenta el caso explícito.
+
+## Desviaciones encontradas al ejecutar (Tasks 4 y 5, 2026-08-14)
+
+**Bug real en el código de la Task 4, corregido.** El Step 3 hacía
+`$funciones[$clave]["recaudacion_{$tipo}"] += $monto` iterando `$tipo` sobre
+`['neto', 'bruto']`, pero los campos de salida son `recaudacion_neta` y
+`recaudacion_bruta`, en femenino. Eso arma `recaudacion_neto`, que no existe: PHP
+no falla, el `+=` **crea dos campos fantasma** y los reales quedan en cero. O sea
+recaudación cero en toda la respuesta más dos claves inventadas, y en producción
+—con los warnings apagados— habría sido silencioso; la Task 6 lo habría fijado
+como respuesta canónica. Se reemplazó la interpolación por un mapa explícito
+`['neto' => 'recaudacion_neta', 'bruto' => 'recaudacion_bruta']`.
+
+**El Step 4 de la Task 4 dice "PASS, 8 tests" y el Step 1 define 10.** Con el test
+agregado abajo son 11.
+
+**Un test más en la Task 4: `wc-pending no cuenta y tampoco avisa`.** Sacar
+`wc-pending` de `IGNORADOS` sobrevivía a toda la suite. Importa porque
+`wc-pending` es un estado real y verificado de esta base, y si avisara, cada
+pedido pendiente sería ruido — el §13 del diseño es explícito en que los avisos
+ruidosos dejan de leerse y el mecanismo muere.
+
+**Gap de diseño detectado, sin tocar:** si un par pedido+producto tiene entradas
+pero **no** tiene línea de plata, el agregador pone recaudación en cero y **no
+avisa** (`$lineas[$par] ?? ['neto' => 0, 'bruto' => 0]`). Hoy es inalcanzable
+—5516/5516 pares tienen línea— pero es la misma categoría de riesgo futuro que
+`prorrateo_ambiguo`, que el plan sí defiende aunque tampoco exista hoy. No se
+agregó un aviso porque el vocabulario de `tipo` es una **lista cerrada de cuatro
+códigos estables** en el §4.1 del diseño (`json_ilegible`, `fecha_no_parseable`,
+`estado_desconocido`, `prorrateo_ambiguo`), y un quinto es decisión de diseño.
+**Pendiente de que Carlos decida** si entra `linea_faltante`.
+
+**El Step 5 de la Task 5 no se pudo correr como está escrito, y se verificó de
+otra forma.** Pide correr el test en el servidor, pero el repo todavía no está
+desplegado allá — eso es la Task 7. En su lugar se corrieron **las tres consultas
+directamente contra la base real por SSH**, que es lo que el punto de parada
+protege:
+
+| Consulta | Resultado real |
+|---|---|
+| `ticketsDeLaFecha('2026-08-07')` | **26 entradas `wc-completed` sobre 6 funciones.** Punto de parada superado |
+| `productosConBookings()` | 18 productos `dateslot` publicados, 0 sin la fila de meta |
+| `lineasDe(...)` | `bruto >= neto` en toda la muestra y `precios_distintos = 1`. En estos pedidos `bruto == neto`, coherente con que el IVA aparece solo en ~14% de las líneas |
+
+Queda pendiente correr el test PHP allá en la Task 7, pero ya no a ciegas: si
+fallara, sería por el mapeo PHP, no por el SQL.
+
+**La base es MariaDB, no MySQL.** El cliente avisa que `mysql` está deprecado en
+favor de `mariadb`. La conexión usa `'driver' => 'mysql'`, que funciona bien
+contra MariaDB; se anota por si alguna vez conviene el driver `mariadb` de
+Laravel.
 
 ## Estructura de archivos
 
