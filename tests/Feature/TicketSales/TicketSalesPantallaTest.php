@@ -218,6 +218,51 @@ test('un día sin funciones se distingue de que el sync nunca corrió', function
         ->assertDontSee('Todavía no hay datos');
 });
 
+test('un nombre largo se corta en el destacado y en las tarjetas', function () {
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Entrada al Gran Bioestanque', 'hora' => '10:00', 'entradas_vendidas' => 30]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Entradas para las 4 funciones', 'hora' => '16:00', 'entradas_vendidas' => 7]);
+
+    $respuesta = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk()
+        ->assertSee('Entrada al Gran Bioe...')
+        ->assertSee('Entradas para las 4...')
+        ->assertDontSee('Entrada al Gran Bioestanque')
+        ->assertDontSee('Entradas para las 4 funciones');
+
+    // El corte es de presentación: el dato que llega a la vista sigue entero,
+    // y el desempate del destacado se sigue decidiendo con el nombre completo.
+    expect($respuesta->viewData('destacado')['show'])->toBe('Entrada al Gran Bioestanque');
+    expect(array_column($respuesta->viewData('resto'), 'show'))->toBe(['Entradas para las 4 funciones']);
+});
+
+test('un nombre que entra no se toca en la pantalla', function () {
+    // La otra mitad, y el nombre es de 23 justos a propósito: con uno corto,
+    // la mutación «cortar siempre a 20» sobreviviría sin que nadie la vea.
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Entradas al Bioestanque', 'hora' => '10:00', 'entradas_vendidas' => 30]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Entradas al Anfiteatro', 'hora' => '16:00', 'entradas_vendidas' => 7]);
+
+    $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk()
+        ->assertSee('Entradas al Bioestanque')
+        ->assertSee('Entradas al Anfiteatro');
+});
+
+test('el tablero de admin no corta los nombres', function () {
+    // El corte se pidió para la TV, donde el rótulo compite con la cifra. En la
+    // tabla del CRM el nombre entero se lee bien y sirve para buscar.
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['show_nombre' => 'Entrada al Gran Bioestanque']);
+
+    $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.index'))
+        ->assertOk()
+        ->assertSee('Entrada al Gran Bioestanque');
+});
+
 test('trae Poppins y se recarga sola', function () {
     sembrarSyncEnPantalla($this->hoy);
     sembrarFuncionEnPantalla($this->hoy);

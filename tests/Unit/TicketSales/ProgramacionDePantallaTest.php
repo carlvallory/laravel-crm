@@ -123,3 +123,43 @@ test('las funciones sin hora van al final', function () {
     expect(array_column($resultado['destacado']['funciones'], 'hora'))
         ->toBe(['08:30', null]);
 });
+
+test('un nombre que entra en 23 caracteres se muestra entero', function () {
+    expect(mb_strlen('Entradas al Bioestanque'))->toBe(23);
+
+    expect(ProgramacionDePantalla::nombreCorto('Entradas al Bioestanque'))
+        ->toBe('Entradas al Bioestanque');
+});
+
+test('un nombre de 24 caracteres ya se corta', function () {
+    // El límite de arriba y este van juntos: con uno solo, correr el tope un
+    // lugar para cualquiera de los dos lados pasaría igual.
+    expect(mb_strlen('Entradas al Bioestanques'))->toBe(24);
+
+    expect(ProgramacionDePantalla::nombreCorto('Entradas al Bioestanques'))
+        ->toBe('Entradas al Bioestan...');
+});
+
+test('el nombre cortado nunca pasa de 23 caracteres, puntos incluidos', function () {
+    $corto = ProgramacionDePantalla::nombreCorto('Entrada al Gran Bioestanque');
+
+    expect($corto)->toBe('Entrada al Gran Bioe...');
+    expect(mb_strlen($corto))->toBe(23);
+});
+
+test('el corte cuenta caracteres y no bytes', function () {
+    // Con `substr` a secas los acentos ocupan dos, así que el nombre saldría
+    // más corto de lo debido y con la última letra partida al medio.
+    $corto = ProgramacionDePantalla::nombreCorto('Función de títeres en el jardín');
+
+    expect($corto)->toBe('Función de títeres e...');
+    expect(mb_strlen($corto))->toBe(23);
+});
+
+test('no queda un espacio colgando antes de los puntos', function () {
+    // El corte cae justo en un espacio: sin `rtrim` saldría «las 4 ...».
+    expect(mb_substr('Entradas para las 4 funciones', 19, 1))->toBe(' ');
+
+    expect(ProgramacionDePantalla::nombreCorto('Entradas para las 4 funciones'))
+        ->toBe('Entradas para las 4...');
+});
