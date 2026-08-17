@@ -118,3 +118,45 @@ test('un synced_at en el futuro no se toma como viejo, ni con un desfase mayor q
     expect($this->estado->esViejo($this->ahora->addMinutes(40), $this->ahora))->toBeFalse();
     expect($this->estado->esViejo($this->ahora->addMinutes(5), $this->ahora))->toBeFalse();
 });
+
+/*
+ * El modo histórico: cuando alguien elige una fecha a mano en el picker.
+ *
+ * Es una puerta aparte y no un caso más de `decidir()` a propósito. Ahí adentro
+ * viven dos criterios que en un día cerrado no significan nada: OTRO_DIA compara
+ * contra hoy, y la antigüedad mide hace cuánto se sincronizó. Un martes de la
+ * semana pasada está terminado, no viejo.
+ */
+test('una fecha sin cabecera propia no tiene datos guardados', function () {
+    expect($this->estado->decidirHistorico(null, 0))
+        ->toBe(EstadoDelTablero::SIN_DATOS_DEL_DIA);
+});
+
+test('una fecha con cabecera y sin funciones es un día sin funciones', function () {
+    // Los dos ceros se ven igual en la tabla y son cosas distintas: sin cabecera
+    // es «ese día no se guardó», con cabecera es «ese día el museo no tuvo
+    // funciones». Es el mismo par que NUNCA y SIN_FUNCIONES resuelven para hoy.
+    expect($this->estado->decidirHistorico('2026-08-12', 0))
+        ->toBe(EstadoDelTablero::SIN_FUNCIONES);
+});
+
+test('una fecha con cabecera y funciones es normal', function () {
+    expect($this->estado->decidirHistorico('2026-08-12', 11))
+        ->toBe(EstadoDelTablero::NORMAL);
+});
+
+test('en histórico la antigüedad no cambia el estado', function () {
+    // El sync de un día cerrado siempre va a estar viejo: se escribió ese día y
+    // nunca más. Si la antigüedad pesara, toda fecha pasada saldría en VIEJO.
+    $estricto = new EstadoDelTablero(1);
+
+    expect($estricto->decidirHistorico('2026-08-12', 11))
+        ->toBe(EstadoDelTablero::NORMAL);
+});
+
+test('en histórico una cabecera de otro día nunca dispara OTRO_DIA', function () {
+    // La guarda de OTRO_DIA es para hoy y solo para hoy. Acá la cabecera se
+    // busca por la fecha pedida, así que preguntar «¿es de hoy?» no aplica.
+    expect($this->estado->decidirHistorico('2026-08-12', 11))
+        ->not->toBe(EstadoDelTablero::OTRO_DIA);
+});
