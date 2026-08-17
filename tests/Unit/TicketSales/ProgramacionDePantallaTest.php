@@ -163,3 +163,94 @@ test('no queda un espacio colgando antes de los puntos', function () {
     expect(ProgramacionDePantalla::nombreCorto('Entradas para las 4 funciones'))
         ->toBe('Entradas para las 4...');
 });
+
+/*
+ * Fusión por hora. El caso real que la motivó: el 2026-08-16, «Exploradores de
+ * Exoplanetas» mostró tres tarjetas —15:30, 16:30 y 16:30— con 25, 02 y 20.
+ *
+ * Las dos de las 16:30 son la misma función: renombraron el slot en WordPress,
+ * los tickets viejos quedaron apuntando a la etiqueta anterior y el servicio los
+ * emite igual, con cupos en null, por la regla de no perder una venta. Para
+ * quien mira la TV eso es una función de las 16:30 con 22 entradas.
+ *
+ * Sumarlas no dobla nada: el servicio indexa por producto+slot, así que las dos
+ * filas son conjuntos de entradas distintos.
+ */
+test('dos funciones del mismo producto a la misma hora se suman en una tarjeta', function () {
+    $resultado = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'hora' => '15:30', 'entradas_vendidas' => 25]),
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'hora' => '16:30', 'entradas_vendidas' => 2]),
+        // La huérfana llega con el nombre vacío, que es lo que emite el servicio.
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => '', 'hora' => '16:30', 'entradas_vendidas' => 20]),
+    ]);
+
+    expect($resultado['destacado']['funciones'])->toBe([
+        ['hora' => '15:30', 'entradas' => 25],
+        ['hora' => '16:30', 'entradas' => 22],
+    ]);
+});
+
+test('fusionar no cambia el total del show', function () {
+    // El total alimenta el criterio del destacado. Si la fusión lo tocara,
+    // cambiaría qué show va al panel grande, que es una decisión ya cerrada.
+    $resultado = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'hora' => '15:30', 'entradas_vendidas' => 25]),
+        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]),
+        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 20]),
+    ]);
+
+    expect($resultado['destacado']['entradas'])->toBe(47);
+});
+
+test('dos funciones sin hora no se fusionan entre sí', function () {
+    // Dos funciones sin horario no tienen por qué ser la misma. Fusionarlas
+    // sería inventar una relación que el dato no afirma.
+    $resultado = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'hora' => null, 'entradas_vendidas' => 3]),
+        funcionDePantalla(['producto_id' => 1, 'hora' => null, 'entradas_vendidas' => 4]),
+    ]);
+
+    expect($resultado['destacado']['funciones'])->toBe([
+        ['hora' => null, 'entradas' => 3],
+        ['hora' => null, 'entradas' => 4],
+    ]);
+});
+
+test('la misma hora en productos distintos no se fusiona', function () {
+    // La fusión es dentro del producto. Dos shows a las 16:30 son dos shows.
+    $resultado = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:30', 'entradas_vendidas' => 20]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Zorros', 'hora' => '16:30', 'entradas_vendidas' => 2]),
+    ]);
+
+    expect($resultado['destacado']['show'])->toBe('Aves');
+    expect($resultado['destacado']['funciones'])->toBe([['hora' => '16:30', 'entradas' => 20]]);
+    expect($resultado['resto'][0]['funciones'])->toBe([['hora' => '16:30', 'entradas' => 2]]);
+});
+
+test('al fusionar, las sin hora siguen yendo al final', function () {
+    $resultado = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'hora' => null, 'entradas_vendidas' => 4]),
+        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]),
+        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 20]),
+        funcionDePantalla(['producto_id' => 1, 'hora' => '08:00', 'entradas_vendidas' => 1]),
+    ]);
+
+    expect(array_column($resultado['destacado']['funciones'], 'hora'))
+        ->toBe(['08:00', '16:30', null]);
+});
+
+test('el desempate por funciones cuenta horarios distintos, no filas', function () {
+    // Consecuencia de la fusión, fijada a propósito. Los dos shows tienen 12
+    // entradas; «Aves» las reparte en dos filas de la MISMA hora y «Zorros» en
+    // dos horas distintas. Contando filas empatarían y ganaría Aves por nombre;
+    // contando horarios gana Zorros, que es el que de verdad tiene más funciones.
+    $resultado = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:00', 'entradas_vendidas' => 6]),
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:00', 'entradas_vendidas' => 6]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Zorros', 'hora' => '10:00', 'entradas_vendidas' => 6]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Zorros', 'hora' => '11:00', 'entradas_vendidas' => 6]),
+    ]);
+
+    expect($resultado['destacado']['show'])->toBe('Zorros');
+});

@@ -273,3 +273,64 @@ test('trae Poppins y se recarga sola', function () {
         ->assertSee('family=Poppins', false)
         ->assertSee('http-equiv="refresh"', false);
 });
+
+/*
+ * El caso del 2026-08-16, sembrado tal cual: «Exploradores de Exoplanetas» con
+ * dos funciones programadas y una tercera fila huérfana —slot renombrado en
+ * WordPress, cupos en null— que cae a la misma hora que una de ellas.
+ */
+test('dos filas del mismo producto a la misma hora se ven como una sola tarjeta', function () {
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (15:30)', 'hora' => '15:30', 'entradas_vendidas' => 25, 'cupos_habilitados' => 5]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 2, 'cupos_habilitados' => 28]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas 3D (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 20, 'cupos_habilitados' => null]);
+
+    $respuesta = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk()
+        ->assertSee('data-cifra="25"', false)
+        ->assertSee('data-cifra="22"', false)
+        // Las dos cifras partidas no pueden quedar en la pantalla.
+        ->assertDontSee('data-cifra="02"', false)
+        ->assertDontSee('data-cifra="20"', false);
+
+    expect($respuesta->viewData('destacado')['funciones'])->toBe([
+        ['hora' => '15:30', 'entradas' => 25],
+        ['hora' => '16:30', 'entradas' => 22],
+    ]);
+});
+
+test('el tablero sigue mostrando las tres filas por separado', function () {
+    // La contracara de la fusión, y por qué el tablero no se toca: es la única
+    // vista donde se ve que hay una función huérfana. Fusionarla también acá
+    // volvería invisible el problema del WordPress que la origina.
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (15:30)', 'hora' => '15:30', 'entradas_vendidas' => 25, 'cupos_habilitados' => 5]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 2, 'cupos_habilitados' => 28]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas 3D (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 20, 'cupos_habilitados' => null]);
+
+    $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.index'))
+        ->assertOk()
+        ->assertSee('Exoplanetas (16:30)')
+        ->assertSee('Exoplanetas 3D (16:30)')
+        // El «—» que delata la función huérfana sigue ahí.
+        ->assertSee('data-cupos-vacio="1"', false)
+        // Y las cifras siguen separadas: 22 es de la pantalla, no de acá.
+        ->assertDontSee('>22<', false);
+});
+
+test('el total del día no cambia al fusionar', function () {
+    // La fusión es de presentación. Si tocara los totales, la tarjeta de
+    // «Entradas vendidas» del tablero y la pantalla se contradirían.
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 20]);
+
+    $respuesta = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk();
+
+    expect($respuesta->viewData('totalEntradas'))->toBe(22);
+    expect($respuesta->viewData('destacado')['entradas'])->toBe(22);
+});
