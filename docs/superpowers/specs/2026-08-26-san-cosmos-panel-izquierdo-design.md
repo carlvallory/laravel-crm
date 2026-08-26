@@ -121,6 +121,13 @@ Lo lee **solo `pantalla()`**, no `datosDelDia()`: el tablero de admin no reparte
 paneles y no le hace falta. Esto no contradice la regla de no duplicar
 `datosDelDia()`: el reparto en paneles es de la pantalla y de nadie más.
 
+Si el valor guardado no tiene la forma esperada, `CriterioDeSanCosmos` devuelve
+lista vacía y el rótulo por defecto, sin lanzar. La consecuencia es acotada y
+visible: nada coincide, **todo** cae a la derecha con su nombre, y la página de
+configuración muestra la lista vacía. Es una falla distinta de la del §4.2 y no
+apaga nada — por eso el que valida de verdad es el POST de la página, que es
+donde una persona puede ver el error y corregirlo.
+
 La comparación de categorías va **normalizada en los dos lados** (`trim` +
 minúsculas). Los slugs de WordPress son minúsculas por convención, pero un slug
 escrito a mano en el campo libre de la UI no tiene por qué serlo.
@@ -160,7 +167,29 @@ agregar un `tipo` nuevo ya rompió una vez.
 
 ### 4.2 Un campo malformado no descarta el día
 
-Si `categorias` viene pero **no es una lista de strings**, se descarta ese campo
+Malformado significa **la forma del campo en la respuesta del servicio**, y el
+único que puede producirlo es el servicio: WooCommerce solo tiene filas en
+`wp_term_relationships` y `wp_term_taxonomy`, y quién decide la forma del JSON es
+el servicio al serializar.
+
+El caso realista es una **evolución del servicio que el CRM no esperaba** —ya
+pasó una vez en este paquete, con un `tipo` nuevo en los `avisos`—:
+
+```json
+"categorias": [{"slug": "ticketera-2-0", "name": "Ticketera 2.0"}]
+```
+
+Alguien enriquece el campo del lado del servicio para llevar también el nombre
+legible, que es un cambio aditivo y razonable allá, y el CRM se encuentra objetos
+donde esperaba strings. Las otras dos variantes plausibles son
+`"categorias": "ticketera-2-0"` —un `implode` que se cuela, o alguien que
+«simplifica» el caso de una sola categoría— y `[128, 129]`, term_ids en vez de
+slugs. Los tres son los casos de test del §8.
+
+`null` y `[]` **no** son este caso: son «no sé» y «sin categorías», y caen a la
+derecha por el §6.3.
+
+Si `categorias` viene pero no es una lista de strings, se descarta ese campo
 —queda `null`— se registra en el log, y **las ventas se guardan igual**.
 
 Esto se aparta a propósito de la regla «el cliente devuelve datos validados o
@@ -302,7 +331,9 @@ fixture canónica.
 
 - Respuesta **sin** `categorias`: no lanza, y el snapshot queda con `null`.
 - Respuesta con `categorias` malformada: no descarta el día, guarda las ventas,
-  deja `null`.
+  deja `null`. Un caso por cada forma del §4.2 — lista de objetos, string suelto,
+  lista de enteros.
+- `categorias` en `[]`: cae a la derecha, y **no** se confunde con malformado.
 
 **Feature, página de configuración:**
 
@@ -310,6 +341,8 @@ fixture canónica.
 - La fila sembrada por la migración aplica sin que nadie configure nada.
 - Los candidatos de checkbox salen de las categorías vistas en la ventana de
   retención.
+- Config con forma inesperada: `CriterioDeSanCosmos` devuelve lista vacía y
+  rótulo por defecto sin lanzar, y la pantalla manda todo a la derecha.
 
 **Sync:** la columna se escribe con lo que vino.
 
