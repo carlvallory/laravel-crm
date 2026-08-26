@@ -5,6 +5,7 @@ use CarlVallory\KrayinTicketSales\Services\FooEventsServiceClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     config([
@@ -255,3 +256,76 @@ test('un día sin funciones es una respuesta válida, no un error', function () 
 
     expect($datos['funciones'])->toBe([]);
 });
+
+test('una respuesta sin categorias no se rechaza y deja el campo en null', function () {
+    // Es el estado real entre el deploy del CRM y el del servicio. Rechazar
+    // acá dispararía OTRO_DIA por un campo que no es una cifra de venta.
+    $cuerpo = respuestaCanonica();
+    unset($cuerpo['funciones'][0]['categorias']);
+
+    Http::fake(['*' => Http::response($cuerpo, 200)]);
+
+    $datos = $this->cliente->funcionesDe('2026-08-07');
+
+    expect($datos['funciones'][0])->toHaveKey('categorias');
+    expect($datos['funciones'][0]['categorias'])->toBeNull();
+});
+
+test('una lista de slugs pasa tal cual', function () {
+    $cuerpo = respuestaCanonica();
+    $cuerpo['funciones'][0]['categorias'] = ['san-cosmos', 'eventos'];
+
+    Http::fake(['*' => Http::response($cuerpo, 200)]);
+
+    expect($this->cliente->funcionesDe('2026-08-07')['funciones'][0]['categorias'])
+        ->toBe(['san-cosmos', 'eventos']);
+});
+
+test('una lista vacía queda en lista vacía, no en null', function () {
+    // "sin categorías" y "no sé" van los dos al panel derecho, pero
+    // confundirlos borra la única señal de que el servicio no manda el campo.
+    $cuerpo = respuestaCanonica();
+    $cuerpo['funciones'][0]['categorias'] = [];
+
+    Http::fake(['*' => Http::response($cuerpo, 200)]);
+
+    expect($this->cliente->funcionesDe('2026-08-07')['funciones'][0]['categorias'])->toBe([]);
+});
+
+test('una lista de objetos no descarta el día: queda null y se loguea', function () {
+    // El caso realista: alguien enriquece el campo del lado del servicio para
+    // llevar también el nombre legible. Es aditivo y razonable allá.
+    Log::spy();
+
+    $cuerpo = respuestaCanonica();
+    $cuerpo['funciones'][0]['categorias'] = [['slug' => 'san-cosmos', 'name' => 'Ticketera SC 2.0']];
+
+    Http::fake(['*' => Http::response($cuerpo, 200)]);
+
+    $datos = $this->cliente->funcionesDe('2026-08-07');
+
+    expect($datos['funciones'][0]['categorias'])->toBeNull();
+    expect($datos['funciones'][0]['entradas_vendidas'])->toBe(2);
+
+    Log::shouldHaveReceived('warning')->once();
+});
+
+test('las otras formas malformadas también quedan en null sin descartar el día', function (mixed $forma) {
+    $cuerpo = respuestaCanonica();
+    $cuerpo['funciones'][0]['categorias'] = $forma;
+
+    Http::fake(['*' => Http::response($cuerpo, 200)]);
+
+    $datos = $this->cliente->funcionesDe('2026-08-07');
+
+    expect($datos['funciones'][0]['categorias'])->toBeNull();
+    expect($datos['funciones'][0]['recaudacion_bruta'])->toBe(70000);
+})->with([
+    // Va como dataset y NO como foreach: `Http::fake()` no reemplaza el stub
+    // anterior, así que en un loop las iteraciones 2 en adelante reciben la
+    // respuesta de la primera y no prueban nada. Lo encontró una mutación.
+    'string suelto: un implode que se cuela' => ['san-cosmos'],
+    'term_ids en vez de slugs'               => [[128, 129]],
+    'mapa, no lista'                         => [['slug' => 'san-cosmos']],
+    'mezcla de slug y entero'                => [['san-cosmos', 128]],
+]);

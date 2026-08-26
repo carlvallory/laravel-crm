@@ -2765,3 +2765,26 @@ y tiene que quedarse a la derecha con su nombre.
   argumento**, así que el test pasaba con cualquier lista de IDs. Se le agregó `->with([777])`.
   Con eso la mutación muere. Es el caso exacto que la disciplina busca: no era una mutación
   equivalente, era un test que no fijaba lo que decía fijar.
+
+### Tasks 4 y 5
+
+- `packages/CarlVallory` está en el `.gitignore` del CRM: **el paquete es su propio repo**. Todo
+  lo de `src/` va ahí y solo los tests van a `laravel-crm`. El paquete estaba en `main`, así que
+  se abrió la rama **`feat/san-cosmos-panel-izquierdo`** (el trabajo anterior del tablero sí
+  había ido directo a `main`). **Para deployar hay que mergearla**: `composer` con `@dev` tira de
+  la rama por defecto.
+- El `exists()` de la siembra se verificó **borrando el registro de `migrations` con la fila
+  presente**, que es la única forma de hacer correr `up()` dos veces. Respetó el valor editado.
+- La mutación «`down()` vacío» sobrevive a los tests, como el plan anticipaba, y se ve a mano:
+  la fila queda después del rollback. **Deja la base de desarrollo sucia** —el guard después
+  respeta el valor de la mutación anterior—, así que hay que borrar fila y registro de migración
+  antes de seguir.
+
+### Task 7
+
+- **Otro test que pasaba por casualidad, encontrado por una mutación.** «las otras formas
+  malformadas» era un `foreach` con `Http::fake()` adentro, y **`Http::fake()` no reemplaza el
+  stub anterior**: las 4 iteraciones recibían la respuesta de la primera forma, así que 3 de las
+  4 nunca se probaban. Se pasó a **dataset de Pest** (4 tests separados, cada uno con su fake).
+  Con eso la mutación «sacar `array_is_list`» muere; antes sobrevivía.
+- El resto de las 6 mutaciones de la task mueren como el plan decía.
