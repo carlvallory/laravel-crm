@@ -217,3 +217,48 @@ test('la purga borra lo más viejo que la retención y respeta el resto', functi
     expect(TicketSalesSnapshot::where('fecha', '2026-08-05')->exists())->toBeTrue();
     expect(TicketSalesSync::where('fecha', '2026-08-05')->exists())->toBeTrue();
 });
+
+test('las categorías de cada función aterrizan en su columna', function () {
+    Http::fake(['*' => Http::response(cuerpoDelServicio([
+        unaFuncion(['categorias' => ['san-cosmos', 'eventos']]),
+    ]), 200)]);
+
+    $this->artisan('ticket-sales:sync --fecha=2026-08-07')->assertSuccessful();
+
+    expect(TicketSalesSnapshot::where('fecha', '2026-08-07')->first()->categorias)
+        ->toBe(['san-cosmos', 'eventos']);
+});
+
+test('una función sin el campo queda con la columna en null', function () {
+    // El servicio viejo. El sync no tiene que inventar una lista vacía: null
+    // es "no sé" y es la verdad de ese momento.
+    Http::fake(['*' => Http::response(cuerpoDelServicio([unaFuncion()]), 200)]);
+
+    $this->artisan('ticket-sales:sync --fecha=2026-08-07')->assertSuccessful();
+
+    expect(TicketSalesSnapshot::where('fecha', '2026-08-07')->first()->categorias)->toBeNull();
+});
+
+test('una función con lista vacía queda con lista vacía, no con null', function () {
+    Http::fake(['*' => Http::response(cuerpoDelServicio([
+        unaFuncion(['categorias' => []]),
+    ]), 200)]);
+
+    $this->artisan('ticket-sales:sync --fecha=2026-08-07')->assertSuccessful();
+
+    expect(TicketSalesSnapshot::where('fecha', '2026-08-07')->first()->categorias)->toBe([]);
+});
+
+test('cada función guarda sus propias categorías, no las de la anterior', function () {
+    Http::fake(['*' => Http::response(cuerpoDelServicio([
+        unaFuncion(['producto_id' => 1, 'slot' => 'A', 'hora' => '10:00', 'categorias' => ['san-cosmos']]),
+        unaFuncion(['producto_id' => 2, 'slot' => 'B', 'hora' => '11:00', 'categorias' => ['talleres']]),
+    ]), 200)]);
+
+    $this->artisan('ticket-sales:sync --fecha=2026-08-07')->assertSuccessful();
+
+    $filas = TicketSalesSnapshot::where('fecha', '2026-08-07')->orderBy('producto_id')->get();
+
+    expect($filas[0]->categorias)->toBe(['san-cosmos']);
+    expect($filas[1]->categorias)->toBe(['talleres']);
+});
