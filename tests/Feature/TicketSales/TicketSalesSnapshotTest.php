@@ -109,3 +109,35 @@ test('no puede haber dos cabeceras para la misma fecha', function () {
         'fecha' => '2026-08-07', 'generado_en' => now(), 'avisos' => [], 'synced_at' => now(),
     ]))->toThrow(\Illuminate\Database\QueryException::class);
 });
+
+test('categorias se guarda como lista y vuelve como array', function () {
+    $fila = TicketSalesSnapshot::create([
+        'fecha'       => '2026-08-07',
+        'producto_id' => 1,
+        'show_nombre' => 'Marte',
+        'slot'        => 'Domo (15:30)',
+        'hora'        => '15:30',
+        'categorias'  => ['san-cosmos', 'eventos'],
+    ]);
+
+    expect($fila->fresh()->categorias)->toBe(['san-cosmos', 'eventos']);
+});
+
+test('categorias en null y en lista vacía no son lo mismo', function () {
+    // `null` es "no sé" —servicio viejo o campo malformado— y `[]` es "este
+    // producto no tiene categorías". Los dos van al panel derecho, pero
+    // confundirlos borra la única señal de que el servicio no está mandando
+    // el campo.
+    $sinDato = TicketSalesSnapshot::create([
+        'fecha' => '2026-08-07', 'producto_id' => 1, 'show_nombre' => 'A',
+        'slot'  => 'X', 'hora' => '10:00', 'categorias' => null,
+    ]);
+
+    $sinCategorias = TicketSalesSnapshot::create([
+        'fecha' => '2026-08-07', 'producto_id' => 2, 'show_nombre' => 'B',
+        'slot'  => 'Y', 'hora' => '11:00', 'categorias' => [],
+    ]);
+
+    expect($sinDato->fresh()->categorias)->toBeNull();
+    expect($sinCategorias->fresh()->categorias)->toBe([]);
+});
