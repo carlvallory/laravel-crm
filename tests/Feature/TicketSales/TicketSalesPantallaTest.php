@@ -84,33 +84,38 @@ test('el tablero enlaza a la pantalla y la pantalla vuelve al tablero', function
         ->assertSee(route('krayin.ticket-sales.index'), false);
 });
 
-test('el destacado es el show con más entradas y muestra sus horarios', function () {
+test('el panel izquierdo junta las funciones del domo y las ordena por hora', function () {
+    // El show se llama «Marte» y no «San Cosmos» a propósito: el rótulo por
+    // defecto del panel ES «San Cosmos», y un show con ese nombre haría que el
+    // assertSee del rótulo pase incluso si el nombre se estuviera filtrando.
     sembrarSyncEnPantalla($this->hoy);
     sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 7]);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '08:30', 'entradas_vendidas' => 30]);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '09:30', 'entradas_vendidas' => 12]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Marte', 'hora' => '08:30', 'entradas_vendidas' => 30, 'categorias' => ['san-cosmos']]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Marte', 'hora' => '09:30', 'entradas_vendidas' => 12, 'categorias' => ['san-cosmos']]);
 
     $respuesta = $this->actingAs($this->admin, 'user')
         ->get(route('krayin.ticket-sales.pantalla'))
         ->assertOk();
 
-    expect($respuesta->viewData('destacado')['show'])->toBe('San Cosmos');
-    expect(array_column($respuesta->viewData('destacado')['funciones'], 'hora'))
+    expect(array_column($respuesta->viewData('sanCosmos')['funciones'], 'hora'))
         ->toBe(['08:30', '09:30']);
 
-    $respuesta->assertSee('San Cosmos')->assertSee('08:30');
+    // El rótulo se ve; el nombre del show del domo, no. «Aves» queda a la derecha.
+    $respuesta->assertSee('San Cosmos')->assertSee('08:30')
+        ->assertDontSee('Marte')
+        ->assertSee('Aves');
 });
 
 test('los demás shows van al panel de programación', function () {
     sembrarSyncEnPantalla($this->hoy);
     sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 7]);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '08:30', 'entradas_vendidas' => 30]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Marte', 'hora' => '08:30', 'entradas_vendidas' => 30, 'categorias' => ['san-cosmos']]);
 
     $respuesta = $this->actingAs($this->admin, 'user')
         ->get(route('krayin.ticket-sales.pantalla'))
         ->assertOk();
 
-    expect(array_column($respuesta->viewData('resto'), 'show'))->toBe(['Aves']);
+    expect(array_column($respuesta->viewData('especiales'), 'show'))->toBe(['Aves']);
 
     $respuesta->assertSee('Programación')->assertSee('Aves');
 });
@@ -155,8 +160,8 @@ test('un show del panel derecho con una sola función muestra la cifra, no un ho
     // siempre» sobrevive: el test de arriba solo prueba que el atributo
     // aparezca, no que aparezca únicamente cuando el show tiene varias.
     sembrarSyncEnPantalla($this->hoy);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '08:30', 'entradas_vendidas' => 30]);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '09:30', 'entradas_vendidas' => 25]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Marte', 'hora' => '08:30', 'entradas_vendidas' => 30, 'categorias' => ['san-cosmos']]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Marte', 'hora' => '09:30', 'entradas_vendidas' => 25, 'categorias' => ['san-cosmos']]);
     sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:00', 'entradas_vendidas' => 12]);
 
     $this->actingAs($this->admin, 'user')
@@ -198,7 +203,8 @@ test('un snapshot de otro día no muestra las funciones', function () {
 
     // Las dos guardas por separado: que la vista no lo dibuje es una, que las
     // filas no lleguen a la vista es otra.
-    expect($respuesta->viewData('destacado'))->toBeNull();
+    expect($respuesta->viewData('sanCosmos')['funciones'])->toBe([]);
+    expect($respuesta->viewData('especiales'))->toBe([]);
 });
 
 test('si el sync nunca corrió lo dice', function () {
@@ -233,8 +239,10 @@ test('un nombre largo se corta en el destacado y en las tarjetas', function () {
 
     // El corte es de presentación: el dato que llega a la vista sigue entero,
     // y el desempate del destacado se sigue decidiendo con el nombre completo.
-    expect($respuesta->viewData('destacado')['show'])->toBe('Entrada al Gran Bioestanque');
-    expect(array_column($respuesta->viewData('resto'), 'show'))->toBe(['Entradas para las 4 funciones']);
+    // Los dos van al panel derecho: a la izquierda ya no hay nombre que cortar,
+    // así que `nombreCorto()` solo vive del lado de los especiales.
+    expect(array_column($respuesta->viewData('especiales'), 'show'))
+        ->toBe(['Entrada al Gran Bioestanque', 'Entradas para las 4 funciones']);
 });
 
 test('un nombre que entra no se toca en la pantalla', function () {
@@ -281,9 +289,9 @@ test('trae Poppins y se recarga sola', function () {
  */
 test('dos filas del mismo producto a la misma hora se ven como una sola tarjeta', function () {
     sembrarSyncEnPantalla($this->hoy);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (15:30)', 'hora' => '15:30', 'entradas_vendidas' => 25, 'cupos_habilitados' => 5]);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 2, 'cupos_habilitados' => 28]);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas 3D (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 20, 'cupos_habilitados' => null]);
+    sembrarFuncionEnPantalla($this->hoy, ['categorias' => ['san-cosmos'], 'producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (15:30)', 'hora' => '15:30', 'entradas_vendidas' => 25, 'cupos_habilitados' => 5]);
+    sembrarFuncionEnPantalla($this->hoy, ['categorias' => ['san-cosmos'], 'producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 2, 'cupos_habilitados' => 28]);
+    sembrarFuncionEnPantalla($this->hoy, ['categorias' => ['san-cosmos'], 'producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'slot' => 'Exoplanetas 3D (16:30)', 'hora' => '16:30', 'entradas_vendidas' => 20, 'cupos_habilitados' => null]);
 
     $respuesta = $this->actingAs($this->admin, 'user')
         ->get(route('krayin.ticket-sales.pantalla'))
@@ -294,7 +302,7 @@ test('dos filas del mismo producto a la misma hora se ven como una sola tarjeta'
         ->assertDontSee('data-cifra="02"', false)
         ->assertDontSee('data-cifra="20"', false);
 
-    expect($respuesta->viewData('destacado')['funciones'])->toBe([
+    expect($respuesta->viewData('sanCosmos')['funciones'])->toBe([
         ['hora' => '15:30', 'entradas' => 25],
         ['hora' => '16:30', 'entradas' => 22],
     ]);
@@ -324,13 +332,174 @@ test('el total del día no cambia al fusionar', function () {
     // La fusión es de presentación. Si tocara los totales, la tarjeta de
     // «Entradas vendidas» del tablero y la pantalla se contradirían.
     sembrarSyncEnPantalla($this->hoy);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]);
-    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 20]);
+    sembrarFuncionEnPantalla($this->hoy, ['categorias' => ['san-cosmos'], 'producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]);
+    sembrarFuncionEnPantalla($this->hoy, ['categorias' => ['san-cosmos'], 'producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 20]);
 
     $respuesta = $this->actingAs($this->admin, 'user')
         ->get(route('krayin.ticket-sales.pantalla'))
         ->assertOk();
 
     expect($respuesta->viewData('totalEntradas'))->toBe(22);
-    expect($respuesta->viewData('destacado')['entradas'])->toBe(22);
+    // El panel izquierdo no lleva total propio: se suma lo que muestran sus
+    // tarjetas, que es justo lo que el invariante quiere comparar.
+    expect(array_sum(array_column($respuesta->viewData('sanCosmos')['funciones'], 'entradas')))->toBe(22);
+});
+
+/**
+ * El criterio, escrito directo en `core_config`. La página que lo edita se
+ * prueba aparte: acá lo que importa es que la pantalla lo lea.
+ */
+function guardarCriterioEnConfig(array $valor): void
+{
+    \Illuminate\Support\Facades\DB::table('core_config')->updateOrInsert(
+        ['code' => \CarlVallory\KrayinTicketSales\Support\CriterioDeSanCosmos::CLAVE],
+        ['value' => json_encode($valor), 'updated_at' => now()]
+    );
+}
+
+test('la pantalla usa el criterio guardado en core_config', function () {
+    guardarCriterioEnConfig(['titulo' => 'Domo MuCi', 'categorias' => ['solo-esta']]);
+
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Marte',
+        'hora' => '15:30', 'entradas_vendidas' => 9, 'categorias' => ['solo-esta']]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Taller de robots',
+        'hora' => '16:00', 'entradas_vendidas' => 4, 'categorias' => ['san-cosmos']]);
+
+    $respuesta = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk();
+
+    // `san-cosmos` ya no cuenta: manda lo guardado, no lo sembrado por la migración.
+    expect($respuesta->viewData('rotuloSanCosmos'))->toBe('Domo MuCi');
+    expect(array_column($respuesta->viewData('especiales'), 'show'))->toBe(['Taller de robots']);
+    expect($respuesta->viewData('sanCosmos')['funciones'])->toBe([['hora' => '15:30', 'entradas' => 9]]);
+
+    $respuesta->assertDontSee('Marte');
+});
+
+test('el panel izquierdo muestra los horarios y las ventas del domo, y ningún nombre', function () {
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Experiencia adaptada',
+        'hora' => '15:30', 'entradas_vendidas' => 25, 'categorias' => ['san-cosmos']]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Misterios de tu Cerebro',
+        'hora' => '17:00', 'entradas_vendidas' => 8, 'categorias' => ['san-cosmos']]);
+
+    $respuesta = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk();
+
+    // Los horarios y las ventas, sí.
+    $respuesta->assertSee('15:30')->assertSee('17:00')
+        ->assertSee('data-cifra="25"', false)
+        ->assertSee('data-cifra="08"', false);
+
+    // Los nombres, no. Es el pedido.
+    $respuesta->assertDontSee('Experiencia adaptada')->assertDontSee('Misterios de tu Cerebro');
+});
+
+test('dos shows del domo a la misma hora se ven como una sola tarjeta', function () {
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Marte',
+        'slot' => 'Domo A', 'hora' => '16:30', 'entradas_vendidas' => 2, 'categorias' => ['san-cosmos']]);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Historias Estelares',
+        'slot' => 'Domo B', 'hora' => '16:30', 'entradas_vendidas' => 20, 'categorias' => ['san-cosmos']]);
+
+    $html = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('data-cifra="22"');
+    expect(substr_count($html, '16:30'))->toBe(1);
+});
+
+test('un día sin domo deja el panel izquierdo con su cartel y el 60/40 intacto', function () {
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Taller de robots',
+        'hora' => '16:00', 'entradas_vendidas' => 4, 'categorias' => ['talleres']]);
+
+    $respuesta = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk();
+
+    expect($respuesta->getContent())->toContain('data-sin-domo="1"');
+    $respuesta->assertSee('Taller de robots')
+        // El cartel de "no hay ninguna función" es otro estado y no tiene que salir.
+        ->assertDontSee('No hay funciones programadas');
+});
+
+test('un día de solo domo dice que solo hay funciones del domo', function () {
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Marte',
+        'hora' => '15:30', 'entradas_vendidas' => 25, 'categorias' => ['san-cosmos']]);
+
+    $html = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('data-solo-domo="1"');
+    expect($html)->not->toContain('data-sin-domo="1"');
+});
+
+test('un día sin ninguna función muestra el cartel a pantalla completa', function () {
+    sembrarSyncEnPantalla($this->hoy);
+
+    $html = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('No hay funciones programadas');
+    expect($html)->not->toContain('data-sin-domo="1"');
+});
+
+test('el rótulo del panel izquierdo sale del config, no del código', function () {
+    guardarCriterioEnConfig(['titulo' => 'Domo MuCi', 'categorias' => ['san-cosmos']]);
+
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Marte',
+        'hora' => '15:30', 'entradas_vendidas' => 25, 'categorias' => ['san-cosmos']]);
+
+    // La actividad especial no es de adorno: sin ella el panel derecho muestra
+    // «Hoy solo hay funciones de Domo MuCi», el rótulo aparece por ahí, y un
+    // `assertSee` pasaría con el título cableado. Lo encontró una mutación.
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 2, 'show_nombre' => 'Taller',
+        'hora' => '16:00', 'entradas_vendidas' => 3, 'categorias' => ['talleres']]);
+
+    $html = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('<h1 class="panel__titulo">Domo MuCi</h1>');
+    expect($html)->not->toContain('data-solo-domo');
+});
+
+test('con las categorías en null todo cae a la derecha, como antes del cambio', function () {
+    // El estado real entre el deploy del CRM y el del servicio.
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Marte',
+        'hora' => '15:30', 'entradas_vendidas' => 25, 'categorias' => null]);
+
+    $respuesta = $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.pantalla'))
+        ->assertOk();
+
+    $respuesta->assertSee('Marte');
+    expect($respuesta->getContent())->toContain('data-sin-domo="1"');
+});
+
+test('el tablero de admin sigue mostrando los nombres del domo', function () {
+    // No es olvido: es la única vista donde se ve una función huérfana, y
+    // esconder el nombre ahí volvería invisible el problema del slot renombrado.
+    sembrarSyncEnPantalla($this->hoy);
+    sembrarFuncionEnPantalla($this->hoy, ['producto_id' => 1, 'show_nombre' => 'Experiencia adaptada',
+        'hora' => '15:30', 'entradas_vendidas' => 25, 'categorias' => ['san-cosmos']]);
+
+    $this->actingAs($this->admin, 'user')
+        ->get(route('krayin.ticket-sales.index'))
+        ->assertOk()
+        ->assertSee('Experiencia adaptada');
 });
