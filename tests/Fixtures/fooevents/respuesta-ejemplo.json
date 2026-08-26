@@ -8,6 +8,7 @@
       "show": "Entrada Bioestanque",
       "slot": "BioEstanque (16:00) (17:00)",
       "hora": "17:00",
+      "categorias": [],
       "entradas_vendidas": 2,
       "entradas_reagendadas": 0,
       "cupos_habilitados": 18,
