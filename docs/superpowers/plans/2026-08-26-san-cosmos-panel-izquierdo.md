@@ -2730,27 +2730,41 @@ Task 5 siembra `san-cosmos` y `entrada-sancosmos`, y el panel izquierdo se puebl
 sync siguiente a que los productos queden categorizados. Hasta entonces muestra «hoy no hay
 funciones», que es el degradado previsto en el §6.4.
 
-**Productos a asignar a «Ticketera SC 2.0» en WooCommerce** (hoy en `eventos`):
+**Productos a asignar a «Ticketera SC 2.0» en WooCommerce** (hoy en `eventos`).
 
-| ID | Producto | ¿Domo? |
+**Corregido el 2026-08-26 con el meta `WooCommerceEventsLocation`:** son **12**, no 13. El
+conteo anterior metía el «Eclipse Lunar en la Costanera», que es al aire libre. Y ese meta
+**no sirve como criterio**: dice «San Cosmos | Un Planetario MuCi» también para «Entrada
+Bioestanque» y «Sábado porã: Observación de aves», que están en el predio pero **no en el
+domo** —su categoría es `entradas-cielo-abierto`—. El meta identifica la **sede**, no la
+sala. Por eso una categoría curada es la respuesta correcta y no hay atajo por los datos
+que ya existen.
+
+| ID | Producto |
+|---|---|
+| 192862 | El Sistema Solar Expandido |
+| 194055 | Marte: La travesía definitiva |
+| 194154 | Misterios de tu Cerebro |
+| 193817 | Historias Estelares: De estrellas a supernovas |
+| 198951 | San Cosmos: una experiencia adaptada |
+| 193653 | Entrada a San Cosmos |
+| 196315 | Entrada a San Cosmos - hospitalidad |
+| 198093 | Exploradores de Exoplanetas |
+| 194339 | Las Constelaciones y el Zodíaco: El misterio de los signos |
+| 194099 | Mundos en órbita: Las Lunas del Sistema Solar |
+| 194228 | El Sistema Solar - La hora tranqui |
+| 193902 | Dinosaurios - Una historia de supervivencia |
+
+Los tres que **no** van, aunque estén cerca:
+
+| ID | Producto | Por qué no |
 |---|---|---|
-| 192862 | El Sistema Solar Expandido | sí |
-| 194055 | Marte: La travesía definitiva | sí |
-| 194154 | Misterios de tu Cerebro | sí |
-| 193817 | Historias Estelares: De estrellas a supernovas | sí |
-| 198951 | San Cosmos: una experiencia adaptada | sí |
-| 193653 | Entrada a San Cosmos | sí |
-| 196315 | Entrada a San Cosmos - hospitalidad | sí |
-| 198093 | Exploradores de Exoplanetas | sí |
-| 194339 | Las Constelaciones y el Zodíaco: El misterio de los signos | sí |
-| 194099 | Mundos en órbita: Las Lunas del Sistema Solar | sí |
-| 194228 | El Sistema Solar - La hora tranqui | sí |
-| 193902 | Dinosaurios - Una historia de supervivencia | **confirmar** |
-| 197624 | Eclipse Lunar en la Costanera de Asunción | **no** — es al aire libre |
+| 197624 | Eclipse Lunar en la Costanera de Asunción | Sede «Costanera de Asunción» |
+| 192637 | Entrada Bioestanque | Sede San Cosmos, pero `entradas-cielo-abierto`: no es el domo |
+| 192681 | Sábado porã: Observación de aves | Idem |
 
-Los dos últimos son los únicos que no salen de lo que se pidió: «Dinosaurios» tiene pinta de
-proyección de domo pero no estaba en la lista original, y el «Eclipse Lunar» es en la costanera
-y tiene que quedarse a la derecha con su nombre.
+«Dinosaurios» queda **confirmado como del domo** por el meta de sede; ya no hay nada que
+preguntar en esta lista.
 
 ### Task 3
 
@@ -2854,10 +2868,9 @@ Ramas, sin pushear: `feat/categorias-de-producto` en el servicio,
    `muci`. Es un paso de deploy, no de desarrollo. **No darla por pasada.**
 2. **Los 5 tests nuevos del repositorio del servicio nunca corrieron contra datos reales** —se
    saltean sin la base `muci`. La consulta sí se verificó a mano contra producción.
-3. **Categorizar los 13 productos del domo en WooCommerce.** Hasta que eso pase, el panel
-   izquierdo muestra «Hoy no hay funciones de San Cosmos» en producción. La lista está en la
-   sección de la Task 2. Y hay dos por confirmar: «Dinosaurios» (¿es del domo?) y «Eclipse Lunar
-   en la Costanera», que **no** lo es.
+3. **Categorizar los 12 productos del domo en WooCommerce.** Hasta que eso pase, el panel
+   izquierdo muestra «Hoy no hay funciones de San Cosmos» en producción. La lista definitiva
+   está en la sección de la Task 2, sin ambigüedades pendientes.
 4. **Mergear la rama del paquete a `main`** antes de deployar: `composer` con `@dev` tira de la
    rama por defecto.
 
