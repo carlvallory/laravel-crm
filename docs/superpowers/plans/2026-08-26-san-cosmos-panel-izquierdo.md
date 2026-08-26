@@ -2788,3 +2788,24 @@ y tiene que quedarse a la derecha con su nombre.
   4 nunca se probaban. Se pasó a **dataset de Pest** (4 tests separados, cada uno con su fake).
   Con eso la mutación «sacar `array_is_list`» muere; antes sobrevivía.
 - El resto de las 6 mutaciones de la task mueren como el plan decía.
+
+### Task 9
+
+- La reescritura conservó **textual** el bloque de `nombreCorto` (líneas 126-165 del archivo
+  viejo). El resto del test se reescribió.
+- **Dos comentarios del archivo quedaban mintiendo y se arreglaron:** el de `nombreCorto` hablaba
+  del «desempate del destacado», y había un **docblock huérfano** sobre la cascada colgado arriba
+  de `fusionarPorHora()` —que no es su método— y que además ya era falso («el panel grande lo
+  decidiría el orden de llegada»). Se movió a `criterio()` y dice lo que la cascada hace ahora:
+  ordenar el panel derecho, no elegirlo.
+- **MUT «`$suyas === null` en vez de `! is_array`» sobrevivía** y no era equivalente en sentido
+  estricto: con un `categorias` string el resultado es el mismo pero PHP tira un warning al
+  hacer `foreach` sobre él, y `phpunit.xml` **no** tiene `failOnWarning`. Se agregó un test que
+  instala un `set_error_handler` y convierte cualquier aviso de PHP en excepción. Con eso muere.
+- **MUT «sacar el corte de `$categoriasSanCosmos === []`» sobrevive y ES equivalente**, como el
+  plan anticipaba: `in_array($x, [], true)` es siempre `false`, así que el corte es claridad y no
+  comportamiento. No se le agrega test.
+- Se corrió una **mutación de control**: agregar una clave extra a los grupos de `especiales`.
+  Sobrevive, y tiene que sobrevivir — el test que prohíbe claves extra es solo del panel
+  izquierdo, que es donde está el pedido. Confirma que ese test no es un congelamiento ciego de
+  la estructura.

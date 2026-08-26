@@ -15,114 +15,270 @@ function funcionDePantalla(array $sobre = []): array
         'show_nombre'       => 'Entrada Bioestanque',
         'hora'              => '16:00',
         'entradas_vendidas' => 2,
+        'categorias'        => ['talleres'],
     ], $sobre);
 }
 
-test('el show con más entradas vendidas va al panel destacado', function () {
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 12]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '08:30', 'entradas_vendidas' => 30]),
-    ]);
+/** La misma función, pero categorizada como domo. */
+function funcionDelDomo(array $sobre = []): array
+{
+    return funcionDePantalla(array_merge(['categorias' => ['san-cosmos']], $sobre));
+}
 
-    expect($resultado['destacado']['show'])->toBe('San Cosmos');
-    expect($resultado['destacado']['entradas'])->toBe(30);
+/** El criterio, tal como lo entrega `CriterioDeSanCosmos::categorias()`. */
+function criterioDomo(): array
+{
+    return ['san-cosmos', 'entrada-sancosmos'];
+}
+
+test('las funciones de una categoría de San Cosmos van al panel izquierdo', function () {
+    $r = ProgramacionDePantalla::armar([
+        funcionDelDomo(['hora' => '15:30', 'entradas_vendidas' => 25]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toBe([['hora' => '15:30', 'entradas' => 25]]);
+    expect($r['especiales'])->toBe([]);
 });
 
-test('a igual cantidad de entradas gana el que tiene más funciones', function () {
+test('las que no están en la lista van a especiales con su nombre', function () {
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['show_nombre' => 'Taller de robots', 'categorias' => ['talleres']]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toBe([]);
+    expect($r['especiales'][0]['show'])->toBe('Taller de robots');
+});
+
+test('alcanza con que UNA de las categorías de la función esté en la lista', function () {
+    // Los productos de WooCommerce suelen llevar varias categorías. Exigir que
+    // todas coincidan dejaría afuera cualquier show del domo que además esté
+    // etiquetado como "eventos" — que hoy es el caso de los 13.
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['categorias' => ['eventos', 'san-cosmos', 'destacados']]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toHaveCount(1);
+    expect($r['especiales'])->toBe([]);
+});
+
+test('categorias en null va a especiales', function () {
+    // El estado del día del deploy: el servicio todavía no manda el campo.
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['categorias' => null]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toBe([]);
+    expect($r['especiales'])->toHaveCount(1);
+});
+
+test('categorias en lista vacía va a especiales', function () {
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['categorias' => []]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toBe([]);
+    expect($r['especiales'])->toHaveCount(1);
+});
+
+test('con el criterio vacío todo va a especiales y nada al panel izquierdo', function () {
+    // Es lo que pasa si la fila de core_config quedó con basura. La pantalla se
+    // degrada a nombres a la derecha, sin apagar nada.
+    $r = ProgramacionDePantalla::armar([
+        funcionDelDomo(),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Taller']),
+    ], []);
+
+    expect($r['sanCosmos']['funciones'])->toBe([]);
+    expect($r['especiales'])->toHaveCount(2);
+});
+
+test('la comparación de categorías ignora mayúsculas y espacios', function () {
+    // El criterio llega normalizado desde CriterioDeSanCosmos; lo que puede
+    // venir sucio es el lado de la función, que sale de WordPress.
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['categorias' => ['  San-Cosmos ']]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toHaveCount(1);
+});
+
+test('dos productos distintos del domo a la misma hora se fusionan en una tarjeta', function () {
+    // El corazón del cambio. El domo es uno: dos funciones a las 16:30 son la
+    // misma función vendida bajo dos etiquetas, y sin nombres dos tarjetas
+    // "16:30" en la TV no significan nada. Sumar no dobla el conteo porque el
+    // servicio indexa por producto + slot.
+    $r = ProgramacionDePantalla::armar([
+        funcionDelDomo(['producto_id' => 1, 'show_nombre' => 'Marte', 'hora' => '16:30', 'entradas_vendidas' => 2]),
+        funcionDelDomo(['producto_id' => 2, 'show_nombre' => 'Historias', 'hora' => '16:30', 'entradas_vendidas' => 20]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toBe([['hora' => '16:30', 'entradas' => 22]]);
+});
+
+test('la misma hora en dos especiales distintos NO se fusiona', function () {
+    // La contracara: a la derecha los nombres se ven, y dos actividades
+    // especiales a la misma hora son dos cosas distintas que pasan a la vez.
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:30', 'entradas_vendidas' => 2]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'hora' => '16:30', 'entradas_vendidas' => 20]),
+    ], criterioDomo());
+
+    expect($r['especiales'])->toHaveCount(2);
+});
+
+test('dos filas del mismo producto del domo a la misma hora se suman', function () {
+    // El caso del slot renombrado en WordPress, que ya existía antes de este
+    // cambio y sigue valiendo.
+    $r = ProgramacionDePantalla::armar([
+        funcionDelDomo(['hora' => '16:30', 'entradas_vendidas' => 2]),
+        funcionDelDomo(['hora' => '16:30', 'entradas_vendidas' => 20]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toBe([['hora' => '16:30', 'entradas' => 22]]);
+});
+
+test('las funciones del panel izquierdo se ordenan por hora', function () {
+    $r = ProgramacionDePantalla::armar([
+        funcionDelDomo(['producto_id' => 1, 'hora' => '17:30', 'entradas_vendidas' => 1]),
+        funcionDelDomo(['producto_id' => 2, 'hora' => '09:00', 'entradas_vendidas' => 2]),
+        funcionDelDomo(['producto_id' => 3, 'hora' => '13:15', 'entradas_vendidas' => 3]),
+    ], criterioDomo());
+
+    expect(array_column($r['sanCosmos']['funciones'], 'hora'))->toBe(['09:00', '13:15', '17:30']);
+});
+
+test('las del domo sin hora no se fusionan entre sí y van al final', function () {
+    // Dos funciones sin horario no tienen por qué ser la misma, y una sin
+    // horario encabezando el panel es donde nadie la espera.
+    $r = ProgramacionDePantalla::armar([
+        funcionDelDomo(['producto_id' => 1, 'hora' => null, 'entradas_vendidas' => 3]),
+        funcionDelDomo(['producto_id' => 2, 'hora' => null, 'entradas_vendidas' => 4]),
+        funcionDelDomo(['producto_id' => 3, 'hora' => '10:00', 'entradas_vendidas' => 5]),
+    ], criterioDomo());
+
+    expect($r['sanCosmos']['funciones'])->toBe([
+        ['hora' => '10:00', 'entradas' => 5],
+        ['hora' => null, 'entradas' => 3],
+        ['hora' => null, 'entradas' => 4],
+    ]);
+});
+
+test('el panel izquierdo no expone el nombre de ningún show', function () {
+    // Es el pedido, fijado en la estructura: si mañana alguien agrega la clave,
+    // este test lo frena antes de que llegue al Blade.
+    $r = ProgramacionDePantalla::armar([
+        funcionDelDomo(['show_nombre' => 'Misterios de tu Cerebro']),
+    ], criterioDomo());
+
+    foreach ($r['sanCosmos']['funciones'] as $funcion) {
+        expect(array_keys($funcion))->toBe(['hora', 'entradas']);
+    }
+
+    expect(json_encode($r['sanCosmos']))->not->toContain('Misterios');
+});
+
+test('especiales queda ordenado por entradas, de mayor a menor', function () {
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'entradas_vendidas' => 3]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'entradas_vendidas' => 30]),
+    ], criterioDomo());
+
+    expect(array_column($r['especiales'], 'show'))->toBe(['Robots', 'Aves']);
+});
+
+test('a igual entradas, en especiales gana el que tiene más funciones', function () {
     // El de una sola función va primero en la entrada a propósito: con un orden
     // estable, no desempatar lo dejaría ganando.
-    $resultado = ProgramacionDePantalla::armar([
+    $r = ProgramacionDePantalla::armar([
         funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 12]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '08:30', 'entradas_vendidas' => 5]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '09:30', 'entradas_vendidas' => 7]),
-    ]);
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'hora' => '08:30', 'entradas_vendidas' => 5]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'hora' => '09:30', 'entradas_vendidas' => 7]),
+    ], criterioDomo());
 
-    expect($resultado['destacado']['show'])->toBe('San Cosmos');
+    expect(array_column($r['especiales'], 'show'))->toBe(['Robots', 'Aves']);
 });
 
-test('con todos los shows en cero gana el de más funciones', function () {
-    // El caso de cada mañana, antes de la primera venta: el empate es la regla.
-    $resultado = ProgramacionDePantalla::armar([
+test('con todos los especiales en cero gana el de más funciones', function () {
+    // Cada mañana, antes de la primera venta, todos están en cero: el empate es
+    // la regla, no el caso raro.
+    $r = ProgramacionDePantalla::armar([
         funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 0]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '08:30', 'entradas_vendidas' => 0]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '09:30', 'entradas_vendidas' => 0]),
-    ]);
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'hora' => '08:30', 'entradas_vendidas' => 0]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'hora' => '09:30', 'entradas_vendidas' => 0]),
+    ], criterioDomo());
 
-    expect($resultado['destacado']['show'])->toBe('San Cosmos');
-    expect($resultado['destacado']['entradas'])->toBe(0);
+    expect(array_column($r['especiales'], 'show'))->toBe(['Robots', 'Aves']);
 });
 
-test('a igual entradas y misma cantidad de funciones desempata el nombre', function () {
-    // «Zeta» va primero en la entrada para que el orden alfabético no coincida
-    // con el de llegada: si coincidiera, el test pasaría sin criterio ninguno.
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Zeta', 'hora' => '10:00', 'entradas_vendidas' => 12]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Alfa', 'hora' => '11:00', 'entradas_vendidas' => 12]),
-    ]);
+test('a igual entradas y funciones, en especiales desempata el nombre', function () {
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Zorros', 'entradas_vendidas' => 0]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Aves', 'entradas_vendidas' => 0]),
+    ], criterioDomo());
 
-    expect($resultado['destacado']['show'])->toBe('Alfa');
+    expect(array_column($r['especiales'], 'show'))->toBe(['Aves', 'Zorros']);
 });
 
-test('las funciones del destacado se ordenan por hora', function () {
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['hora' => '19:00', 'entradas_vendidas' => 13]),
-        funcionDePantalla(['hora' => '08:30', 'entradas_vendidas' => 12]),
-        funcionDePantalla(['hora' => '16:00', 'entradas_vendidas' => 21]),
-    ]);
+test('el desempate por funciones cuenta horarios distintos, no filas', function () {
+    // Dos filas a la misma hora son UNA función en la tarjeta. Contarlas como
+    // dos dejaría ganando a un show con una sola función y una fila duplicada.
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 5]),
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 0]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'hora' => '11:00', 'entradas_vendidas' => 3]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Robots', 'hora' => '12:00', 'entradas_vendidas' => 2]),
+    ], criterioDomo());
 
-    expect(array_column($resultado['destacado']['funciones'], 'hora'))
-        ->toBe(['08:30', '16:00', '19:00']);
+    expect(array_column($r['especiales'], 'show'))->toBe(['Robots', 'Aves']);
 });
 
-test('el resto queda ordenado por entradas, de mayor a menor', function () {
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '10:00', 'entradas_vendidas' => 7]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '08:30', 'entradas_vendidas' => 30]),
-        funcionDePantalla(['producto_id' => 3, 'show_nombre' => 'Creamundos', 'hora' => '11:00', 'entradas_vendidas' => 12]),
-    ]);
+test('agrupa especiales por producto, no por nombre', function () {
+    $r = ProgramacionDePantalla::armar([
+        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Igual', 'hora' => '10:00', 'entradas_vendidas' => 1]),
+        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Igual', 'hora' => '11:00', 'entradas_vendidas' => 1]),
+    ], criterioDomo());
 
-    expect(array_column($resultado['resto'], 'show'))->toBe(['Creamundos', 'Aves']);
+    expect($r['especiales'])->toHaveCount(2);
 });
 
-test('un solo show deja el resto vacío', function () {
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['hora' => '16:00', 'entradas_vendidas' => 2]),
-    ]);
+test('sin funciones los dos paneles quedan vacíos', function () {
+    $r = ProgramacionDePantalla::armar([], criterioDomo());
 
-    expect($resultado['destacado']['show'])->toBe('Entrada Bioestanque');
-    expect($resultado['resto'])->toBe([]);
+    expect($r['sanCosmos']['funciones'])->toBe([]);
+    expect($r['especiales'])->toBe([]);
 });
 
-test('sin funciones no hay destacado', function () {
-    $resultado = ProgramacionDePantalla::armar([]);
+test('un día de solo domo deja especiales vacío', function () {
+    $r = ProgramacionDePantalla::armar([funcionDelDomo()], criterioDomo());
 
-    expect($resultado['destacado'])->toBeNull();
-    expect($resultado['resto'])->toBe([]);
+    expect($r['especiales'])->toBe([]);
+    expect($r['sanCosmos']['funciones'])->toHaveCount(1);
 });
 
-test('agrupa por producto, no por nombre', function () {
-    // Dos productos distintos con el mismo título siguen siendo dos shows: el
-    // producto es la identidad, igual que en la llave del servicio.
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'San Cosmos', 'hora' => '10:00', 'entradas_vendidas' => 7]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'San Cosmos', 'hora' => '11:00', 'entradas_vendidas' => 30]),
-    ]);
+test('un día sin domo deja el panel izquierdo sin funciones', function () {
+    $r = ProgramacionDePantalla::armar([funcionDePantalla()], criterioDomo());
 
-    expect($resultado['destacado']['producto_id'])->toBe(2);
-    expect($resultado['resto'])->toHaveCount(1);
-    expect($resultado['resto'][0]['producto_id'])->toBe(1);
+    expect($r['sanCosmos']['funciones'])->toBe([]);
+    expect($r['especiales'])->toHaveCount(1);
 });
 
-test('las funciones sin hora van al final', function () {
-    // Sin el `hora IS NULL` primero, una función sin horario encabeza el panel.
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['hora' => null, 'entradas_vendidas' => 4]),
-        funcionDePantalla(['hora' => '08:30', 'entradas_vendidas' => 12]),
-    ]);
+test('fusionar no cambia el total de entradas del día', function () {
+    // El invariante que protege contra doblar el conteo al cruzar productos.
+    $funciones = [
+        funcionDelDomo(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]),
+        funcionDelDomo(['producto_id' => 2, 'hora' => '16:30', 'entradas_vendidas' => 20]),
+        funcionDelDomo(['producto_id' => 2, 'hora' => '17:30', 'entradas_vendidas' => 5]),
+        funcionDePantalla(['producto_id' => 3, 'hora' => '11:00', 'entradas_vendidas' => 7]),
+    ];
 
-    expect(array_column($resultado['destacado']['funciones'], 'hora'))
-        ->toBe(['08:30', null]);
+    $r = ProgramacionDePantalla::armar($funciones, criterioDomo());
+
+    $enPantalla = array_sum(array_column($r['sanCosmos']['funciones'], 'entradas'))
+        + array_sum(array_column($r['especiales'], 'entradas'));
+
+    expect($enPantalla)->toBe(34);
 });
+
 
 test('un nombre que entra en 23 caracteres se muestra entero', function () {
     expect(mb_strlen('Entradas al Bioestanque'))->toBe(23);
@@ -164,93 +320,27 @@ test('no queda un espacio colgando antes de los puntos', function () {
         ->toBe('Entradas para las 4...');
 });
 
-/*
- * Fusión por hora. El caso real que la motivó: el 2026-08-16, «Exploradores de
- * Exoplanetas» mostró tres tarjetas —15:30, 16:30 y 16:30— con 25, 02 y 20.
- *
- * Las dos de las 16:30 son la misma función: renombraron el slot en WordPress,
- * los tickets viejos quedaron apuntando a la etiqueta anterior y el servicio los
- * emite igual, con cupos en null, por la regla de no perder una venta. Para
- * quien mira la TV eso es una función de las 16:30 con 22 entradas.
- *
- * Sumarlas no dobla nada: el servicio indexa por producto+slot, así que las dos
- * filas son conjuntos de entradas distintos.
- */
-test('dos funciones del mismo producto a la misma hora se suman en una tarjeta', function () {
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'hora' => '15:30', 'entradas_vendidas' => 25]),
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Exoplanetas', 'hora' => '16:30', 'entradas_vendidas' => 2]),
-        // La huérfana llega con el nombre vacío, que es lo que emite el servicio.
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => '', 'hora' => '16:30', 'entradas_vendidas' => 20]),
-    ]);
 
-    expect($resultado['destacado']['funciones'])->toBe([
-        ['hora' => '15:30', 'entradas' => 25],
-        ['hora' => '16:30', 'entradas' => 22],
-    ]);
-});
+test('un categorias que no es lista ni null va a especiales, sin iterar basura', function () {
+    // No llega por el camino del sync —el cliente garantiza array|null— pero la
+    // clase es pura y recibe lo que le pasen. Sin el `is_array`, el `foreach`
+    // recorrería un string y PHP tiraría un warning; con él, la función cae a la
+    // derecha y no pasa nada. Se afirma el warning y no solo el resultado,
+    // porque el resultado es el mismo por los dos caminos.
+    $r = null;
 
-test('fusionar no cambia el total del show', function () {
-    // El total alimenta el criterio del destacado. Si la fusión lo tocara,
-    // cambiaría qué show va al panel grande, que es una decisión ya cerrada.
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'hora' => '15:30', 'entradas_vendidas' => 25]),
-        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]),
-        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 20]),
-    ]);
+    set_error_handler(function (int $nivel, string $mensaje) {
+        throw new RuntimeException("PHP avisó: {$mensaje}");
+    });
 
-    expect($resultado['destacado']['entradas'])->toBe(47);
-});
+    try {
+        $r = ProgramacionDePantalla::armar([
+            funcionDePantalla(['categorias' => 'san-cosmos']),
+        ], criterioDomo());
+    } finally {
+        restore_error_handler();
+    }
 
-test('dos funciones sin hora no se fusionan entre sí', function () {
-    // Dos funciones sin horario no tienen por qué ser la misma. Fusionarlas
-    // sería inventar una relación que el dato no afirma.
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'hora' => null, 'entradas_vendidas' => 3]),
-        funcionDePantalla(['producto_id' => 1, 'hora' => null, 'entradas_vendidas' => 4]),
-    ]);
-
-    expect($resultado['destacado']['funciones'])->toBe([
-        ['hora' => null, 'entradas' => 3],
-        ['hora' => null, 'entradas' => 4],
-    ]);
-});
-
-test('la misma hora en productos distintos no se fusiona', function () {
-    // La fusión es dentro del producto. Dos shows a las 16:30 son dos shows.
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:30', 'entradas_vendidas' => 20]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Zorros', 'hora' => '16:30', 'entradas_vendidas' => 2]),
-    ]);
-
-    expect($resultado['destacado']['show'])->toBe('Aves');
-    expect($resultado['destacado']['funciones'])->toBe([['hora' => '16:30', 'entradas' => 20]]);
-    expect($resultado['resto'][0]['funciones'])->toBe([['hora' => '16:30', 'entradas' => 2]]);
-});
-
-test('al fusionar, las sin hora siguen yendo al final', function () {
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'hora' => null, 'entradas_vendidas' => 4]),
-        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 2]),
-        funcionDePantalla(['producto_id' => 1, 'hora' => '16:30', 'entradas_vendidas' => 20]),
-        funcionDePantalla(['producto_id' => 1, 'hora' => '08:00', 'entradas_vendidas' => 1]),
-    ]);
-
-    expect(array_column($resultado['destacado']['funciones'], 'hora'))
-        ->toBe(['08:00', '16:30', null]);
-});
-
-test('el desempate por funciones cuenta horarios distintos, no filas', function () {
-    // Consecuencia de la fusión, fijada a propósito. Los dos shows tienen 12
-    // entradas; «Aves» las reparte en dos filas de la MISMA hora y «Zorros» en
-    // dos horas distintas. Contando filas empatarían y ganaría Aves por nombre;
-    // contando horarios gana Zorros, que es el que de verdad tiene más funciones.
-    $resultado = ProgramacionDePantalla::armar([
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:00', 'entradas_vendidas' => 6]),
-        funcionDePantalla(['producto_id' => 1, 'show_nombre' => 'Aves', 'hora' => '16:00', 'entradas_vendidas' => 6]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Zorros', 'hora' => '10:00', 'entradas_vendidas' => 6]),
-        funcionDePantalla(['producto_id' => 2, 'show_nombre' => 'Zorros', 'hora' => '11:00', 'entradas_vendidas' => 6]),
-    ]);
-
-    expect($resultado['destacado']['show'])->toBe('Zorros');
+    expect($r['sanCosmos']['funciones'])->toBe([]);
+    expect($r['especiales'])->toHaveCount(1);
 });
