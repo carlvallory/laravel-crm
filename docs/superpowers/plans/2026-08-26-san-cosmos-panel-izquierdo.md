@@ -2681,4 +2681,87 @@ En `packages/CarlVallory/KrayinTicketSales/CLAUDE.md` y su `README.md`: que el p
 
 ## Desviaciones encontradas al ejecutar
 
-_(Vacío al empezar. Acá van: los slugs reales que devolvió la consulta de la Task 2 Step 1, los tests que salieron de las mutaciones que sobrevivieron, y cualquier decisión que el plan no cubría.)_
+### Task 1
+
+- **`php artisan test` no corre el servicio en local.** El `php` del sistema es 8.3.33 y el
+  repo pide `>= 8.4.1`. Va con **`php8.4 artisan test`** (`/usr/bin/php8.4`, 8.4.24). La
+  constante global del plan decía `php artisan test` y estaba mal.
+- **La Task 1 dejaba la suite del servicio en rojo.** El agregador ya emite `categorias` y la
+  fixture canónica todavía no lo tenía, así que `RespuestaCanonicaTest` fallaba en el commit
+  intermedio. **Se movió la actualización de la fixture a la Task 1**, con `"categorias": []`
+  —que es lo que el servicio produce en ese punto—, y la Task 3 la sube al valor real. Las dos
+  copias de la fixture se editaron juntas y siguen byte-idénticas.
+- Por lo anterior, la mutación «mover `categorias` al final del array» **sí muere** en la
+  Task 1 (la mata `RespuestaCanonicaTest` por orden de claves). El plan la daba por descubierta
+  recién en la Task 3.
+
+### Task 2
+
+- **El tercer test del plan usaba `->or->toBe([])`, que no existe en Pest.** Reescrito como un
+  `foreach` que afirma que no vuelve ningún producto que no se pidió.
+- **Las dos mutaciones que el plan marcaba como "van a sobrevivir" se cubrieron de entrada**, en
+  vez de dejarlas anotadas: «todo lo que devuelve es de la taxonomía product_cat» (con un
+  conjunto de referencia que sale de una consulta distinta a la del método, para que el test no
+  se pruebe a sí mismo) y «devuelve slugs y no nombres» (sin espacios, sin mayúsculas).
+- **La query quedó verificada contra la base `muci` de producción** (SSH `anthropic_readonly`,
+  solo lectura, 2026-08-26): devuelve `producto_id → slugs`, ordenada, solo `product_cat`.
+  Los 5 tests Pest siguen salteándose en local por diseño del repo del servicio.
+
+#### Los slugs del spec no existen, y la categoría del domo está vacía
+
+Lo que devolvió la consulta de `product_cat`:
+
+| Nombre | Slug real | Productos |
+|---|---|---|
+| Ticketera SC 2.0 | **`san-cosmos`** | 0 |
+| Entradas San Cosmos | **`entrada-sancosmos`** | 0 |
+| Entradas Especiales | `entradas-especiales` | 0 |
+| Eventos | `eventos` | 17 |
+
+Ni `ticketera-2-0` ni `entrada-san-cosmos` —los dos que el spec asumía— existen en la base.
+
+Y el problema de fondo: **los 13 productos `dateslot` del domo están todos en `eventos`**, que
+además contiene al menos uno que no es del domo («Eclipse Lunar en la Costanera de Asunción»,
+al aire libre). La premisa del §2 del spec —que el domo comparte una categoría propia— es
+cierta como intención y falsa en los datos: la categoría existe y nadie la aplicó.
+
+**Decisión de Carlos (2026-08-26): se categoriza en WooCommerce.** El código no cambia. La
+Task 5 siembra `san-cosmos` y `entrada-sancosmos`, y el panel izquierdo se puebla solo en el
+sync siguiente a que los productos queden categorizados. Hasta entonces muestra «hoy no hay
+funciones», que es el degradado previsto en el §6.4.
+
+**Productos a asignar a «Ticketera SC 2.0» en WooCommerce** (hoy en `eventos`):
+
+| ID | Producto | ¿Domo? |
+|---|---|---|
+| 192862 | El Sistema Solar Expandido | sí |
+| 194055 | Marte: La travesía definitiva | sí |
+| 194154 | Misterios de tu Cerebro | sí |
+| 193817 | Historias Estelares: De estrellas a supernovas | sí |
+| 198951 | San Cosmos: una experiencia adaptada | sí |
+| 193653 | Entrada a San Cosmos | sí |
+| 196315 | Entrada a San Cosmos - hospitalidad | sí |
+| 198093 | Exploradores de Exoplanetas | sí |
+| 194339 | Las Constelaciones y el Zodíaco: El misterio de los signos | sí |
+| 194099 | Mundos en órbita: Las Lunas del Sistema Solar | sí |
+| 194228 | El Sistema Solar - La hora tranqui | sí |
+| 193902 | Dinosaurios - Una historia de supervivencia | **confirmar** |
+| 197624 | Eclipse Lunar en la Costanera de Asunción | **no** — es al aire libre |
+
+Los dos últimos son los únicos que no salen de lo que se pidió: «Dinosaurios» tiene pinta de
+proyección de domo pero no estaba en la lista original, y el «Eclipse Lunar» es en la costanera
+y tiene que quedarse a la derecha con su nombre.
+
+### Task 3
+
+- **Eran 8 bloques de mock, no 9.** El del test «503 si la base muci no responde» hace que
+  `productosConBookings` lance, así que nunca llega a `categoriasPorProducto` y no necesita
+  declararlo. Los 8 se inyectaron por script anclando en la línea de `lineasDe`.
+- **La fixture canónica quedó con los slugs REALES** de `Entrada Bioestanque`
+  (`["entradas", "entradas-cielo-abierto"]`) en vez del `["entrada-bioestanque"]` inventado en
+  el plan. Sale gratis y deja la fixture honesta.
+- **Un test pasaba por casualidad, y la mutación lo encontró.** «ids solo de los tickets»
+  sobrevivió: en «cada función sale con sus categorías» el mock devolvía el mapa **sin mirar el
+  argumento**, así que el test pasaba con cualquier lista de IDs. Se le agregó `->with([777])`.
+  Con eso la mutación muere. Es el caso exacto que la disciplina busca: no era una mutación
+  equivalente, era un test que no fijaba lo que decía fijar.
