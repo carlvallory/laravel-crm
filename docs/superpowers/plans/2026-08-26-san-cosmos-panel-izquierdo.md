@@ -2809,3 +2809,55 @@ y tiene que quedarse a la derecha con su nombre.
   Sobrevive, y tiene que sobrevivir — el test que prohíbe claves extra es solo del panel
   izquierdo, que es donde está el pedido. Confirma que ese test no es un congelamiento ciego de
   la estructura.
+
+### Task 10
+
+- **Tercer test que pasaba por casualidad, encontrado por una mutación.** «el rótulo del panel
+  izquierdo sale del config» hacía `assertSee('Domo MuCi')`, y como el test sembraba **solo** una
+  función del domo, el panel derecho mostraba «Hoy solo hay funciones de Domo MuCi»: el rótulo
+  aparecía por ahí y no por el `<h1>`. Con el título cableado el test pasaba igual. Se le agregó
+  una actividad especial y el assert va contra el `<h1>` exacto.
+- Los tests que hablaban de «destacado» se adaptaron; los de nombres largos **se mudaron al panel
+  derecho**, que es donde `nombreCorto()` sigue vivo. Los de dato viejo, histórico, `OTRO_DIA`,
+  chrome del CRM y tablero de admin no se tocaron.
+- **Defecto visual que ningún test detecta, encontrado mirando la pantalla:** el cartel del panel
+  vacío reusaba `.aviso__detalle` y quedaba en 1rem, peso 400, pegado arriba a la izquierda de un
+  panel de 60% — ilegible desde el hall. Se le dio clase propia (`.panel__vacio`: centrada, peso
+  700, `clamp(1.25rem, 2.6vw, 3rem)`). El Step 11 del plan pedía exactamente este chequeo.
+- Verificado en navegador a 1920×1080 y 1080×1920: cero scroll en las dos, 8 funciones del domo
+  entran 4×2 con la cifra en 107px, y el cartel centrado a 28px en vertical.
+
+### Task 11
+
+- **MUT «sin `whereNotNull`» sobrevive y es equivalente**, como el plan anticipaba: el `filter`
+  de `is_string` ya descarta los `null` que deja el `flatten`.
+- **MUT «sin normalizar al guardar» sobrevivía y NO era equivalente.** `CriterioDeSanCosmos`
+  normaliza al leer, así que un valor sucio se ve bien de todos modos — pero el tope de 255 se
+  mide sobre el JSON **guardado**, donde los espacios cuentan. Se agregó un test que mira el
+  `value` crudo de `core_config`. Con eso muere.
+- Ciclo completo ejercitado a mano: destildar todo manda las 2 funciones a la derecha con nombre
+  y prende `data-sin-domo`; volver a tildar devuelve la del domo a la izquierda; el rótulo cambia
+  a «Domo del MuCi»; y 30 categorías se rechazan con mensaje **sin perder el criterio anterior**.
+
+## Estado al cerrar (2026-08-26)
+
+**Las 11 tasks cerradas.** `194 passed` en el CRM, `63 passed / 9 skipped` en el servicio (los 9
+son los del repositorio, que necesitan la base `muci`).
+
+Ramas, sin pushear: `feat/categorias-de-producto` en el servicio,
+`feat/san-cosmos-panel-izquierdo` en el paquete, `feat/ticket-sales-dashboard` en el CRM.
+
+### Lo que falta y por qué
+
+1. **La prueba de aceptación no se corrió.** Necesita el servicio escuchando en
+   `127.0.0.1:8081`, que solo existe en el servidor porque es el único con la credencial de
+   `muci`. Es un paso de deploy, no de desarrollo. **No darla por pasada.**
+2. **Los 5 tests nuevos del repositorio del servicio nunca corrieron contra datos reales** —se
+   saltean sin la base `muci`. La consulta sí se verificó a mano contra producción.
+3. **Categorizar los 13 productos del domo en WooCommerce.** Hasta que eso pase, el panel
+   izquierdo muestra «Hoy no hay funciones de San Cosmos» en producción. La lista está en la
+   sección de la Task 2. Y hay dos por confirmar: «Dinosaurios» (¿es del domo?) y «Eclipse Lunar
+   en la Costanera», que **no** lo es.
+4. **Mergear la rama del paquete a `main`** antes de deployar: `composer` con `@dev` tira de la
+   rama por defecto.
+
