@@ -76,12 +76,19 @@ it('calcula la conversión con Won y Lost de leads con canal', function () {
 
 it('en conversión avisa que las ventas sin canal quedan afuera, no que cuentan en los totales', function () {
     F::wonLead('2031-03-16 10:00:00', ['title' => 'Donación', 'lead_value' => 800]);
+    F::wonLead('2031-03-17 10:00:00', ['title' => 'Carga manual', 'lead_value' => 900]);
+    F::lead(['lead_pipeline_stage_id' => F::stageId('lost'), 'closed_at' => '2031-03-18 10:00:00', 'lead_value' => 700]);
 
     $avisos = implode(' | ', ventas('conversion', 'desde=2031-03-01&hasta=2031-03-31')->json('avisos'));
 
-    expect($avisos)->toContain('sin canal')
+    // ConversionQuery excluye los sin canal de Won y de Lost: el aviso cuenta los 3.
+    expect($avisos)->toContain('3 ventas sin canal')
         ->toContain('No se incluyen en la conversión')
         ->not->toContain('Cuentan en los totales');
+
+    // En el resumen (solo Won) siguen siendo 2.
+    expect(implode(' | ', ventas('ventas/resumen', 'desde=2031-03-01&hasta=2031-03-31')->json('avisos')))
+        ->toContain('2 ventas sin canal');
 });
 
 it('avisa que el filtro por producto suma la orden entera', function () {
