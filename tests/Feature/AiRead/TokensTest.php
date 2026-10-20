@@ -95,6 +95,27 @@ it('registra cada acceso sin el token', function () {
         ->not->toContain($token);
 });
 
+it('no registra secretos de la query string', function () {
+    $path = storage_path('framework/testing/ia-accesos-test.log');
+    @mkdir(dirname($path), 0777, true);
+    @unlink($path);
+    config(['logging.channels.ia_accesos' => ['driver' => 'single', 'path' => $path, 'level' => 'info']]);
+    Log::forgetChannel('ia_accesos');
+
+    $this->getJson('/api/ia/v1/_prueba?token=iar_loquesea')->assertStatus(401);
+    $this->getJson('/api/ia/v1/_prueba?Access_Token=secreto1&API_KEY=secreto2&x=iar_escondido&desde=2031-01-01')
+        ->assertStatus(401);
+
+    $log = file_get_contents($path);
+    expect($log)->not->toContain('iar_loquesea')
+        ->not->toContain('secreto1')
+        ->not->toContain('secreto2')
+        ->not->toContain('iar_escondido')
+        ->toContain('"token":"[redactado]"')
+        ->toContain('"x":"[redactado]"')
+        ->toContain('"desde":"2031-01-01"');
+});
+
 it('el comando crea, lista y revoca tokens', function () {
     $this->artisan('crm:ia-token', ['accion' => 'crear', 'consumidor' => 'grok', '--vence' => now()->addYear()->toDateString()])
         ->expectsOutputToContain('UNA sola vez')
