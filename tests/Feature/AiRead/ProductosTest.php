@@ -45,9 +45,15 @@ it('rankea por unidades y suma el monto del renglón, no price × cantidad', fun
 });
 
 it('ordena por monto', function () {
-    $ids = collect(productos('ranking', 'desde=2031-03-01&hasta=2031-03-31&orden=monto')->json('datos'))->pluck('producto_id')->all();
+    // Pocas unidades y monto alto: por monto va primero, por unidades va último.
+    $caro = F::product(['name' => 'Telescopio', 'product_kind' => 'merch']);
+    $l = F::wonLead('2031-03-07 10:00:00', ['lead_value' => 9000, 'branch' => 'Online']);
+    F::leadProduct($l, $caro, 1, 9000);
 
-    expect($ids)->toBe([$this->especial, $this->merch, $this->sede]);
+    $ids = fn (string $orden) => collect(productos('ranking', "desde=2031-03-01&hasta=2031-03-31&orden={$orden}")->json('datos'))->pluck('producto_id')->all();
+
+    expect($ids('monto'))->toBe([$caro, $this->especial, $this->merch, $this->sede])
+        ->and($ids('unidades'))->toBe([$this->especial, $this->merch, $this->sede, $caro]);
 });
 
 it('filtra por clase, incluida programación especial', function () {
@@ -87,6 +93,25 @@ it('sin movimiento no cuenta ventas Excluida como historia', function () {
     $ids = collect(productos('sin-movimiento', 'desde=2031-03-01&hasta=2031-03-31&limite=100')->assertOk()->json('datos'))->pluck('producto_id');
 
     expect($ids)->toContain($this->viejo)->not->toContain($this->nunca);
+});
+
+it('sin movimiento aplica los mismos filtros a la historia y al rango', function () {
+    // Llavero: se vende en órdenes de merch antes y durante el rango.
+    $llavero = F::product(['name' => 'Llavero', 'product_kind' => 'merch']);
+    $h = F::wonLead('2030-05-10 10:00:00', ['lead_value' => 100, 'branch' => 'Online', 'order_type' => 'merch']);
+    F::leadProduct($h, $llavero, 1, 100);
+    $r = F::wonLead('2031-03-10 10:00:00', ['lead_value' => 100, 'branch' => 'Online', 'order_type' => 'merch']);
+    F::leadProduct($r, $llavero, 1, 100);
+
+    $ids = fn (string $filtro) => collect(productos('sin-movimiento', "desde=2031-03-01&hasta=2031-03-31&limite=100&{$filtro}")->assertOk()->json('datos'))->pluck('producto_id');
+
+    // Dentro del universo de entradas el llavero no tiene historia: no es "sin movimiento".
+    expect($ids('tipo=entradas'))->not->toContain($llavero)
+        // Dentro del universo de merch se vendió en el rango: tampoco.
+        ->and($ids('tipo=merch'))->not->toContain($llavero)
+        // La taza solo tiene historia en Online: en San Cosmos no cuenta.
+        ->and($ids('sucursal=San%20Cosmos'))->not->toContain($this->viejo)
+        ->and($ids('sucursal=Online'))->toContain($this->viejo);
 });
 
 it('muestra el estado que carga Operaciones', function () {
