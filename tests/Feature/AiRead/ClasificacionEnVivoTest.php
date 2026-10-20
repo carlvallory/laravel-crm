@@ -94,9 +94,48 @@ it('recalcula el tipo de orden al vincular productos', function () {
     expect(canal($id)['order_type'])->toBe('mixto');
 });
 
+it('un listener posterior (NetValue) no pisa la clasificación con el lead en memoria desactualizado', function () {
+    $id = F::lead(['lead_value' => 5000]);
+    F::eav('leads', $id, 'wc_payment_method', 'bancard');
+    Event::dispatch('lead.create.after', LeadProxy::modelClass()::find($id));
+    expect(canal($id)['order_type'])->toBe('desconocido');
+
+    // Como en LeadRepository::update: el modelo se carga, después se vinculan
+    // productos (saved → reclasifica en la base) y recién al final se despacha
+    // lead.update.after con ese mismo modelo, que en memoria tiene el canal viejo.
+    $lead = LeadProxy::modelClass()::find($id);
+    $merch = F::product(['product_kind' => 'merch']);
+    LeadProductProxy::modelClass()::create(['lead_id' => $id, 'product_id' => $merch, 'quantity' => 1, 'price' => 5000, 'amount' => 5000]);
+    expect(canal($id)['order_type'])->toBe('merch');
+
+    Event::dispatch('lead.update.after', $lead);
+
+    expect(canal($id)['order_type'])->toBe('merch')
+        ->and(canal($id)['branch'])->toBe('Online')
+        ->and($lead->order_type)->toBe('merch');
+});
+
+it('desvincular un producto por la REST API reclasifica el tipo de orden', function () {
+    actingAsSanctumAuthenticatedAdmin();
+    $id = F::lead(['lead_value' => 5000]);
+    F::eav('leads', $id, 'wc_payment_method', 'bancard');
+    Event::dispatch('lead.create.after', LeadProxy::modelClass()::find($id));
+
+    $merch = F::product(['product_kind' => 'merch']);
+    $entrada = F::product(['product_kind' => 'entrada']);
+    LeadProductProxy::modelClass()::create(['lead_id' => $id, 'product_id' => $merch, 'quantity' => 1, 'price' => 1000, 'amount' => 1000]);
+    LeadProductProxy::modelClass()::create(['lead_id' => $id, 'product_id' => $entrada, 'quantity' => 1, 'price' => 4000, 'amount' => 4000]);
+    expect(canal($id)['order_type'])->toBe('mixto');
+
+    $this->deleteJson("/api/v1/leads/product/{$id}", ['product_id' => $entrada])->assertSuccessful();
+
+    expect(DB::table('lead_products')->where('lead_id', $id)->pluck('product_id')->all())->toBe([$merch])
+        ->and(canal($id)['order_type'])->toBe('merch');
+});
+
 it('un error al clasificar no rompe el guardado del lead', function () {
     $mock = Mockery::mock(LeadChannelUpdater::class);
-    $mock->shouldReceive('reclassify')->andThrow(new RuntimeException('falla de prueba'));
+    $mock->shouldReceive('reclassify')->once()->andThrow(new RuntimeException('falla de prueba'));
     app()->instance(LeadChannelUpdater::class, $mock);
 
     $id = F::lead();
