@@ -29,6 +29,20 @@ it('cuenta altas, compradores nuevos y recurrentes por período', function () {
     ]]);
 });
 
+it('una venta Excluida previa no convierte al comprador en recurrente', function () {
+    $c = F::person('2030-11-01 10:00:00');
+    F::wonLead('2031-02-10 10:00:00', ['person_id' => $c, 'lead_value' => 1000, 'branch' => 'Excluida']);
+    F::wonLead('2031-03-10 10:00:00', ['person_id' => $c, 'lead_value' => 1000, 'branch' => 'Online']);
+
+    $r = $this->withToken($this->token)
+        ->getJson('/api/ia/v1/contactos/resumen?desde=2031-03-01&hasta=2031-03-31')
+        ->assertOk();
+
+    expect($r->json('datos'))->toBe([[
+        'periodo' => '2031-03', 'altas' => 2, 'compradores_nuevos' => 2, 'compradores_recurrentes' => 1,
+    ]]);
+});
+
 it('no devuelve datos personales', function () {
     $json = $this->withToken($this->token)
         ->getJson('/api/ia/v1/contactos/resumen?desde=2031-01-01&hasta=2031-03-31')
