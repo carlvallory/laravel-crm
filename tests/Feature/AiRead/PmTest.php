@@ -27,7 +27,19 @@ it('resume leads por pipeline y etapa, con antigüedad y aviso', function () {
     expect($porCodigo['new']['leads'])->toBe(2)
         ->and($porCodigo['won']['leads'])->toBe(1)
         ->and($porCodigo['won']['dias_promedio'])->toEqual(6.0) // JSON serializa 6.0 como 6
-        ->and(implode(' ', $r->json('avisos')))->toContain('no guarda');
+        ->and(implode(' ', $r->json('avisos')))->toContain('no guarda')
+        ->and(implode(' ', $r->json('avisos')))->toContain('no usa sucursal, variación, tipo ni producto');
+});
+
+it('el pipeline no cuenta las operaciones Excluida, igual que ventas/resumen', function () {
+    F::wonLead('2031-03-10 10:00:00', ['branch' => 'San Cosmos', 'lead_value' => 1000]);
+    F::wonLead('2031-03-11 10:00:00', ['branch' => null, 'lead_value' => 1000]);
+    F::wonLead('2031-03-12 10:00:00', ['branch' => 'Excluida', 'lead_value' => 1000]);
+
+    $won = collect(pm('pipeline/resumen', 'desde=2031-03-01&hasta=2031-03-31')->json('datos'))->firstWhere('codigo', 'won');
+    $ordenes = collect(pm('ventas/resumen', 'desde=2031-03-01&hasta=2031-03-31')->json('datos'))->sum('ordenes');
+
+    expect($won['leads'])->toBe(2)->and($ordenes)->toBe(2);
 });
 
 it('cuenta actividades pendientes y vencidas por tipo y responsable, sin textos', function () {

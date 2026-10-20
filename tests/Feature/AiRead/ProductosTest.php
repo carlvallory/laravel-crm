@@ -126,3 +126,11 @@ it('muestra el estado que carga Operaciones', function () {
         ->and($datos[$this->sede]['estado'])->toBe('activo')
         ->and($datos[$this->merch])->not->toHaveKey('user_id');
 });
+
+it('el estado avisa cuando el resultado llena el límite', function () {
+    $avisos = fn (string $query) => implode(' ', productos('estado', $query)->assertOk()->json('avisos'));
+
+    // 2 productos pedidos, límite 2: puede haber más. Límite 3: entraron todos.
+    expect($avisos("producto={$this->merch},{$this->sede}&limite=2"))->toContain('Puede haber más productos')
+        ->and($avisos("producto={$this->merch},{$this->sede}&limite=3"))->not->toContain('Puede haber más productos');
+});
