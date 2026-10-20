@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a06255c5927d220903f265732a3f3819",
+    "content-hash": "9532028b40c843574fc29354b5254b98",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -213,12 +213,47 @@
             "time": "2023-12-11T17:09:12+00:00"
         },
         {
+            "name": "carlvallory/krayin-ai-read",
+            "version": "dev-feat/v1",
+            "dist": {
+                "type": "path",
+                "url": "packages/CarlVallory/KrayinAiRead",
+                "reference": "ca2761bf3c3ce3e9d26d135e277820f8448d6aa3"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "CarlVallory\\KrayinAiRead\\Providers\\KrayinAiReadServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "CarlVallory\\KrayinAiRead\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carl Vallory"
+                }
+            ],
+            "description": "Lectura del CRM para Claude y Grok + canal de venta",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "carlvallory/krayin-closed-at-fix",
-            "version": "dev-master",
+            "version": "2.1.x-dev",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinClosedAtFix",
-                "reference": "caaa2e59748b9f7d86d3ab0e5d796ef501817141"
+                "reference": "0470fd6d627a56b080f3d183f8842a438a0129ee"
             },
             "type": "library",
             "extra": {
@@ -250,11 +285,11 @@
         },
         {
             "name": "carlvallory/krayin-financial-reports",
-            "version": "dev-main",
+            "version": "2.1.x-dev",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinFinancialReports",
-                "reference": "c381ed20e946eb9523f69593ae289225319a4334"
+                "reference": "25a066c69217ada2bde75f9cd92ab89e4d25e21e"
             },
             "type": "library",
             "extra": {
@@ -290,7 +325,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/Vallory/KrayinFormatter",
-                "reference": "19a75efd1195dfa11402b02d34afddbec9a6ac04"
+                "reference": "5f9843f0d9c5cbf2f741b7906d7165bf4db84bf5"
             },
             "require": {
                 "krayin/laravel-crm": "*",
@@ -326,11 +361,11 @@
         },
         {
             "name": "carlvallory/krayin-fundraising",
-            "version": "dev-master",
+            "version": "2.1.x-dev",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinFundraising",
-                "reference": "0ce3c9572566e1d8d0e3ddfdc7b597e6a114f6ae"
+                "reference": "1081e22ebcaefbbe9fc51f643f94822eacaf5175"
             },
             "type": "library",
             "extra": {
@@ -362,11 +397,11 @@
         },
         {
             "name": "carlvallory/krayin-google-auth",
-            "version": "dev-main",
+            "version": "2.1.x-dev",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinGoogleAuth",
-                "reference": "7645cf9d2b750fb7ae5f27dbaa5d61c081375900"
+                "reference": "4fee8e5b3a160578fba18970e16cf31c97e25911"
             },
             "require": {
                 "laravel/socialite": "^5.0"
@@ -402,11 +437,11 @@
         },
         {
             "name": "carlvallory/krayin-net-value",
-            "version": "dev-main",
+            "version": "2.1.x-dev",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinNetValue",
-                "reference": "b56a1ab5a472d3f54ec5189de559072b031f2859"
+                "reference": "60e5d7c13535b21cf7894515a31cb0805b8f08bc"
             },
             "type": "library",
             "extra": {
@@ -475,11 +510,11 @@
         },
         {
             "name": "carlvallory/krayin-whatsapp",
-            "version": "dev-main",
+            "version": "2.1.x-dev",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinWhatsApp",
-                "reference": "92c39aaaa1e5c6eaaee691e200e32869fe4ba39d"
+                "reference": "9b7e749d8b0850ecd8db526844b02869eb35ac0a"
             },
             "type": "library",
             "extra": {
@@ -511,11 +546,11 @@
         },
         {
             "name": "carlvallory/krayin-woocommerce",
-            "version": "dev-main",
+            "version": "2.1.x-dev",
             "dist": {
                 "type": "path",
                 "url": "packages/CarlVallory/KrayinWoocommerce",
-                "reference": "4855f76128e877224c2d5584cd62a93fc4263079"
+                "reference": "220c4c1582e5cfa0a115cfbbcd16956c1a3db6c5"
             },
             "type": "library",
             "extra": {
@@ -12661,6 +12696,7 @@
         "carlvallory/krayin-formatter": 20,
         "carlvallory/krayin-fundraising": 20,
         "carlvallory/krayin-google-auth": 20,
+        "carlvallory/krayin-ai-read": 20,
         "carlvallory/krayin-net-value": 20,
         "carlvallory/krayin-operations": 20,
         "carlvallory/krayin-whatsapp": 20,
@@ -12672,6 +12708,6 @@
     "platform": {
         "php": "^8.1"
     },
-    "platform-dev": {},
+    "platform-dev": [],
     "plugin-api-version": "2.6.0"
 }
