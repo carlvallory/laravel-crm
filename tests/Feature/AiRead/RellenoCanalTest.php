@@ -100,6 +100,33 @@ it('es idempotente', function () {
     expect($despues->toArray())->toEqual($antes->toArray());
 });
 
+it('resuelve todos los tipos de producto antes de clasificar, aunque crucen lotes', function () {
+    // P se clasifica recién con la orden del tercer lead, pero el primero ya lo usa.
+    $p = F::product(['sku' => 'WC-800021']);
+    $q = F::product(['sku' => 'WC-800022']);
+
+    $l1 = F::lead(['title' => 'Cliente: D - Orden #900201', 'lead_value' => 1000, 'created_at' => '2031-04-02 10:00:00']);
+    F::leadProduct($l1, $p, 1, 1000);
+    ordenWoo(900201, 'bancard', 'Bancard', null, null, [[800030, 0]]); // sin producto CRM asociado
+
+    $l2 = F::lead(['title' => 'Cliente: E - Orden #900202', 'lead_value' => 1000, 'created_at' => '2031-04-03 10:00:00']);
+    F::leadProduct($l2, $q, 1, 1000);
+    ordenWoo(900202, 'bancard', 'Bancard', null, null, [[800022, 0]]);
+
+    $l3 = F::lead(['title' => 'Cliente: F - Orden #900203', 'lead_value' => 1000, 'created_at' => '2031-04-04 10:00:00']);
+    F::leadProduct($l3, $p, 1, 1000);
+    ordenWoo(900203, 'bancard', 'Bancard', null, null, [[800021, 0]]);
+    DB::table('wpzv_postmeta')->insert(['post_id' => 800021, 'meta_key' => 'WooCommerceEventsEvent', 'meta_value' => 'Event']);
+
+    $this->artisan('crm:ia-rellenar-canal', ['--escribir' => true, '--desde' => '2031-04-01', '--hasta' => '2031-04-30', '--lote' => 1, '--pausa' => 0])
+        ->assertSuccessful();
+
+    expect(DB::table('leads')->whereIn('id', [$l1, $l2, $l3])->orderBy('id')->pluck('order_type')->all())
+        ->toBe(['entradas', 'merch', 'entradas'])
+        ->and(DB::table('products')->where('id', $p)->value('product_kind'))->toBe('entrada')
+        ->and(DB::table('products')->where('id', $q)->value('product_kind'))->toBe('merch');
+});
+
 it('rechaza fechas mal escritas', function () {
     $this->artisan('crm:ia-rellenar-canal', ['--desde' => '2031-02-30'])->assertFailed();
 });
