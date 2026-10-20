@@ -9,6 +9,7 @@ beforeEach(function () {
     F::useDefaultConnection();
     $this->token = F::token();
     $p = F::product(['product_kind' => 'merch']);
+    $this->producto = $p;
 
     $canal = fn (string $branch, string $var, string $tipo = 'merch') => ['branch' => $branch, 'sale_variation' => $var, 'order_type' => $tipo];
 
@@ -71,6 +72,29 @@ it('calcula la conversión con Won y Lost de leads con canal', function () {
     expect($r->json('datos'))->toBe([[
         'periodo' => '2031-03', 'concretadas' => 3, 'no_concretadas' => 1, 'tasa' => 0.75,
     ]]);
+});
+
+it('en conversión avisa que las ventas sin canal quedan afuera, no que cuentan en los totales', function () {
+    F::wonLead('2031-03-16 10:00:00', ['title' => 'Donación', 'lead_value' => 800]);
+
+    $avisos = implode(' | ', ventas('conversion', 'desde=2031-03-01&hasta=2031-03-31')->json('avisos'));
+
+    expect($avisos)->toContain('sin canal')
+        ->toContain('No se incluyen en la conversión')
+        ->not->toContain('Cuentan en los totales');
+});
+
+it('avisa que el filtro por producto suma la orden entera', function () {
+    $otro = F::product(['product_kind' => 'merch']);
+    $mixta = F::wonLead('2031-03-20 10:00:00', ['lead_value' => 5000, 'branch' => 'Online', 'sale_variation' => 'Online', 'order_type' => 'merch']);
+    F::leadProduct($mixta, $this->producto, 1, 1000);
+    F::leadProduct($mixta, $otro, 2, 2000);
+
+    $r = ventas('ventas/resumen', "desde=2031-03-01&hasta=2031-03-31&producto={$this->producto}");
+
+    expect($r->json('avisos'))->toContain(\CarlVallory\KrayinAiRead\Queries\AvisosVentas::PRODUCTO)
+        ->and(ventas('ventas/resumen', 'desde=2031-03-01&hasta=2031-03-31')->json('avisos'))
+        ->not->toContain(\CarlVallory\KrayinAiRead\Queries\AvisosVentas::PRODUCTO);
 });
 
 it('avisa que la conversión anterior a julio de 2026 no es comparable', function () {
